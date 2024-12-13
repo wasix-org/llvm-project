@@ -1,0 +1,180 @@
+From ff6065981ded8e5d242e46efdd3cdc5507196e81 Mon Sep 17 00:00:00 2001
+From: "M.Amin Rayej" <m.amin.rayej@gmail.com>
+Date: Fri, 13 Dec 2024 03:19:24 +0330
+Subject: [PATCH] clang-slim
+
+---
+ clang/tools/driver/CMakeLists.txt           | 18 +++---
+ clang/tools/driver/driver.cpp               | 28 ++++-----
+ llvm/cmake/modules/LLVMProcessSources.cmake | 70 ++++++++++-----------
+ 3 files changed, 58 insertions(+), 58 deletions(-)
+
+diff --git a/clang/tools/driver/CMakeLists.txt b/clang/tools/driver/CMakeLists.txt
+index 237ed453e28f..082b683c5348 100644
+--- a/clang/tools/driver/CMakeLists.txt
++++ b/clang/tools/driver/CMakeLists.txt
+@@ -25,24 +25,24 @@ endif()
+ 
+ add_clang_tool(clang
+   driver.cpp
+-  cc1_main.cpp
+-  cc1as_main.cpp
+-  cc1gen_reproducer_main.cpp
++  # cc1_main.cpp
++  # cc1as_main.cpp
++  # cc1gen_reproducer_main.cpp
+ 
+   DEPENDS
+-  intrinsics_gen
+-  ${support_plugins}
++  # intrinsics_gen
++  # ${support_plugins}
+   GENERATE_DRIVER
+   )
+ 
+ clang_target_link_libraries(clang
+   PRIVATE
+-  clangBasic
+-  clangCodeGen
++  # clangBasic
++  # clangCodeGen
+   clangDriver
+   clangFrontend
+-  clangFrontendTool
+-  clangSerialization
++  # clangFrontendTool
++  # clangSerialization
+   )
+ 
+ if(WIN32 AND NOT CYGWIN)
+diff --git a/clang/tools/driver/driver.cpp b/clang/tools/driver/driver.cpp
+index d74741233653..50423748911a 100644
+--- a/clang/tools/driver/driver.cpp
++++ b/clang/tools/driver/driver.cpp
+@@ -205,12 +205,12 @@ static void ApplyQAOverride(SmallVectorImpl<const char*> &Args,
+   }
+ }
+ 
+-extern int cc1_main(ArrayRef<const char *> Argv, const char *Argv0,
+-                    void *MainAddr);
+-extern int cc1as_main(ArrayRef<const char *> Argv, const char *Argv0,
+-                      void *MainAddr);
+-extern int cc1gen_reproducer_main(ArrayRef<const char *> Argv,
+-                                  const char *Argv0, void *MainAddr);
++// extern int cc1_main(ArrayRef<const char *> Argv, const char *Argv0,
++//                     void *MainAddr);
++// extern int cc1as_main(ArrayRef<const char *> Argv, const char *Argv0,
++//                       void *MainAddr);
++// extern int cc1gen_reproducer_main(ArrayRef<const char *> Argv,
++//                                   const char *Argv0, void *MainAddr);
+ 
+ static void insertTargetAndModeArgs(const ParsedClangName &NameParts,
+                                     SmallVectorImpl<const char *> &ArgVector,
+@@ -355,14 +355,14 @@ static int ExecuteCC1Tool(SmallVectorImpl<const char *> &ArgV) {
+     return 1;
+   }
+   StringRef Tool = ArgV[1];
+-  void *GetExecutablePathVP = (void *)(intptr_t)GetExecutablePath;
+-  if (Tool == "-cc1")
+-    return cc1_main(ArrayRef(ArgV).slice(1), ArgV[0], GetExecutablePathVP);
+-  if (Tool == "-cc1as")
+-    return cc1as_main(ArrayRef(ArgV).slice(2), ArgV[0], GetExecutablePathVP);
+-  if (Tool == "-cc1gen-reproducer")
+-    return cc1gen_reproducer_main(ArrayRef(ArgV).slice(2), ArgV[0],
+-                                  GetExecutablePathVP);
++  // void *GetExecutablePathVP = (void *)(intptr_t)GetExecutablePath;
++  // if (Tool == "-cc1")
++  //   return cc1_main(ArrayRef(ArgV).slice(1), ArgV[0], GetExecutablePathVP);
++  // if (Tool == "-cc1as")
++  //   return cc1as_main(ArrayRef(ArgV).slice(2), ArgV[0], GetExecutablePathVP);
++  // if (Tool == "-cc1gen-reproducer")
++  //   return cc1gen_reproducer_main(ArrayRef(ArgV).slice(2), ArgV[0],
++  //                                 GetExecutablePathVP);
+   // Reject unknown tools.
+   llvm::errs() << "error: unknown integrated tool '" << Tool << "'. "
+                << "Valid tools include '-cc1' and '-cc1as'.\n";
+diff --git a/llvm/cmake/modules/LLVMProcessSources.cmake b/llvm/cmake/modules/LLVMProcessSources.cmake
+index e021943d4b2e..4fdf82bee0a2 100644
+--- a/llvm/cmake/modules/LLVMProcessSources.cmake
++++ b/llvm/cmake/modules/LLVMProcessSources.cmake
+@@ -77,42 +77,42 @@ endfunction(llvm_process_sources)
+ 
+ 
+ function(llvm_check_source_file_list)
+-  cmake_parse_arguments(ARG "" "SOURCE_DIR" "" ${ARGN})
+-  foreach(l ${ARG_UNPARSED_ARGUMENTS})
+-      get_filename_component(fp ${l} REALPATH)
+-      list(APPEND listed ${fp})
+-  endforeach()
++#   cmake_parse_arguments(ARG "" "SOURCE_DIR" "" ${ARGN})
++#   foreach(l ${ARG_UNPARSED_ARGUMENTS})
++#       get_filename_component(fp ${l} REALPATH)
++#       list(APPEND listed ${fp})
++#   endforeach()
+ 
+-  if(ARG_SOURCE_DIR)
+-    file(GLOB globbed
+-         "${ARG_SOURCE_DIR}/*.c" "${ARG_SOURCE_DIR}/*.cpp")
+-  else()
+-    file(GLOB globbed *.c *.cpp)
+-  endif()
++#   if(ARG_SOURCE_DIR)
++#     file(GLOB globbed
++#          "${ARG_SOURCE_DIR}/*.c" "${ARG_SOURCE_DIR}/*.cpp")
++#   else()
++#     file(GLOB globbed *.c *.cpp)
++#   endif()
+ 
+-  foreach(g ${globbed})
+-    get_filename_component(fn ${g} NAME)
+-    if(ARG_SOURCE_DIR)
+-      set(entry "${g}")
+-    else()
+-      set(entry "${fn}")
+-    endif()
+-    get_filename_component(gp ${g} REALPATH)
++#   foreach(g ${globbed})
++#     get_filename_component(fn ${g} NAME)
++#     if(ARG_SOURCE_DIR)
++#       set(entry "${g}")
++#     else()
++#       set(entry "${fn}")
++#     endif()
++#     get_filename_component(gp ${g} REALPATH)
+ 
+-    # Don't reject hidden files. Some editors create backups in the
+-    # same directory as the file.
+-    if (NOT "${fn}" MATCHES "^\\.")
+-      if(NOT ${entry} IN_LIST LLVM_OPTIONAL_SOURCES)
+-        if(NOT ${gp} IN_LIST listed)
+-          if(ARG_SOURCE_DIR)
+-              set(fn_relative "${ARG_SOURCE_DIR}/${fn}")
+-          else()
+-              set(fn_relative "${fn}")
+-          endif()
+-          message(SEND_ERROR "Found unknown source file ${fn_relative}
+-Please update ${CMAKE_CURRENT_LIST_FILE}\n")
+-        endif()
+-      endif()
+-    endif()
+-  endforeach()
++#     # Don't reject hidden files. Some editors create backups in the
++#     # same directory as the file.
++#     if (NOT "${fn}" MATCHES "^\\.")
++#       if(NOT ${entry} IN_LIST LLVM_OPTIONAL_SOURCES)
++#         if(NOT ${gp} IN_LIST listed)
++#           if(ARG_SOURCE_DIR)
++#               set(fn_relative "${ARG_SOURCE_DIR}/${fn}")
++#           else()
++#               set(fn_relative "${fn}")
++#           endif()
++#           message(SEND_ERROR "Found unknown source file ${fn_relative}
++# Please update ${CMAKE_CURRENT_LIST_FILE}\n")
++#         endif()
++#       endif()
++#     endif()
++#   endforeach()
+ endfunction(llvm_check_source_file_list)
+-- 
+2.43.0
+

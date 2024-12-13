@@ -1,0 +1,780 @@
+From 1682071228a2efd03016cd797601a55ddae4b869 Mon Sep 17 00:00:00 2001
+From: "M.Amin Rayej" <m.amin.rayej@gmail.com>
+Date: Mon, 23 Sep 2024 15:52:14 +0330
+Subject: [PATCH 1/3] after patch
+
+---
+ clang/tools/driver/cc1_main.cpp               |  6 ++-
+ clang/tools/libclang/CIndexer.cpp             | 15 +++++-
+ libcxx/include/cstddef                        |  6 +++
+ llvm/cmake/modules/AddLLVM.cmake              | 18 +++----
+ llvm/cmake/modules/CheckAtomic.cmake          |  4 +-
+ llvm/lib/ExecutionEngine/Orc/MemoryMapper.cpp |  2 +-
+ llvm/lib/LTO/CMakeLists.txt                   |  3 +-
+ llvm/lib/Support/Unix/Memory.inc              |  5 +-
+ llvm/lib/Support/Unix/Path.inc                | 47 ++++++++++++++++---
+ llvm/lib/Support/Unix/Process.inc             |  2 +-
+ llvm/lib/Support/Unix/Program.inc             |  3 ++
+ llvm/lib/Support/Unix/Signals.inc             |  4 ++
+ llvm/lib/Support/Unix/Unix.h                  |  5 ++
+ llvm/lib/Transforms/Hello/CMakeLists.txt      | 16 +++----
+ llvm/tools/CMakeLists.txt                     |  6 +--
+ llvm/tools/lli/lli.cpp                        |  3 +-
+ llvm/tools/llvm-lto/CMakeLists.txt            | 10 ++--
+ third-party/benchmark/src/cycleclock.h        |  4 ++
+ 18 files changed, 117 insertions(+), 42 deletions(-)
+
+diff --git a/clang/tools/driver/cc1_main.cpp b/clang/tools/driver/cc1_main.cpp
+index c79306b6f..a4db803ac 100644
+--- a/clang/tools/driver/cc1_main.cpp
++++ b/clang/tools/driver/cc1_main.cpp
+@@ -135,9 +135,10 @@ static void ensureStackAddressSpace() {}
+ /// Attempt to ensure that we have at least 8MiB of usable stack space.
+ static void ensureSufficientStack() {
+   struct rlimit rlim;
++#ifndef __wasm32__
+   if (getrlimit(RLIMIT_STACK, &rlim) != 0)
+     return;
+-
++#endif
+   // Increase the soft stack limit to our desired level, if necessary and
+   // possible.
+   if (rlim.rlim_cur != RLIM_INFINITY &&
+@@ -150,10 +151,11 @@ static void ensureSufficientStack() {
+       return;
+     else
+       rlim.rlim_cur = rlim.rlim_max;
+-
++#ifndef __wasm32__
+     if (setrlimit(RLIMIT_STACK, &rlim) != 0 ||
+         rlim.rlim_cur != DesiredStackSize)
+       return;
++#endif
+   }
+ 
+   // We should now have a stack of size at least DesiredStackSize. Ensure
+diff --git a/clang/tools/libclang/CIndexer.cpp b/clang/tools/libclang/CIndexer.cpp
+index 77da2e4fa..1bc353680 100644
+--- a/clang/tools/libclang/CIndexer.cpp
++++ b/clang/tools/libclang/CIndexer.cpp
+@@ -36,6 +36,7 @@
+ #elif defined(_AIX)
+ #include <errno.h>
+ #include <sys/ldr.h>
++#elif defined(__wasm32__)
+ #else
+ #include <dlfcn.h>
+ #endif
+@@ -124,6 +125,19 @@ const std::string &CIndexer::getClangResourcesPath() {
+   LibClangPath += path;
+ #elif defined(_AIX)
+   getClangResourcesPathImplAIX(LibClangPath);
++#elif defined(__wasm32__)
++  std::string Path;
++  printf(">>> indexer\n");
++  if (!(Path = llvm::sys::fs::getMainExecutable(nullptr, nullptr)).empty()) {
++    // If we can't get the path using dladdr, try to get the main executable
++    // path. This may be needed when we're statically linking libclang with
++    // musl libc, for example.
++    LibClangPath += Path;
++  } else {
++    // It's rather unlikely we end up here. But it could happen, so report an
++    // error instead of crashing.
++    llvm::report_fatal_error("could not locate Clang resource path");
++  }  
+ #else
+   Dl_info info;
+   std::string Path;
+@@ -141,7 +155,6 @@ const std::string &CIndexer::getClangResourcesPath() {
+     // error instead of crashing.
+     llvm::report_fatal_error("could not locate Clang resource path");
+   }
+-
+ #endif
+ 
+   // Cache our result.
+diff --git a/libcxx/include/cstddef b/libcxx/include/cstddef
+index e3c066917..e7c9c2a32 100644
+--- a/libcxx/include/cstddef
++++ b/libcxx/include/cstddef
+@@ -42,6 +42,12 @@ Types:
+ 
+ #include <stddef.h>
+ 
++#ifdef __wasm32__
++typedef unsigned long size_t;
++typedef long ptrdiff_t;
++typedef long long intmax_t;
++#endif
++
+ #ifndef _LIBCPP_STDDEF_H
+ #   error <cstddef> tried including <stddef.h> but didn't find libc++'s <stddef.h> header. \
+           This usually means that your header search paths are not configured properly. \
+diff --git a/llvm/cmake/modules/AddLLVM.cmake b/llvm/cmake/modules/AddLLVM.cmake
+index 9eef4eb7e..5ebb2bc3e 100644
+--- a/llvm/cmake/modules/AddLLVM.cmake
++++ b/llvm/cmake/modules/AddLLVM.cmake
+@@ -595,7 +595,7 @@ function(llvm_add_library name)
+ 
+   if(NOT ARG_NO_INSTALL_RPATH)
+     if(ARG_MODULE OR ARG_SHARED)
+-      llvm_setup_rpath(${name})
++      #llvm_setup_rpath(${name})
+     endif()
+   endif()
+ 
+@@ -968,14 +968,14 @@ macro(add_llvm_executable name)
+   setup_dependency_debugging(${name} ${LLVM_COMMON_DEPENDS})
+ 
+   if(NOT ARG_NO_INSTALL_RPATH)
+-    llvm_setup_rpath(${name})
++    #llvm_setup_rpath(${name})
+   elseif(NOT "${LLVM_LOCAL_RPATH}" STREQUAL "")
+     # Enable BUILD_WITH_INSTALL_RPATH unless CMAKE_BUILD_RPATH is set.
+     if("${CMAKE_BUILD_RPATH}" STREQUAL "")
+-      set_property(TARGET ${name} PROPERTY BUILD_WITH_INSTALL_RPATH ON)
++      #set_property(TARGET ${name} PROPERTY BUILD_WITH_INSTALL_RPATH ON)
+     endif()
+ 
+-    set_property(TARGET ${name} PROPERTY INSTALL_RPATH "${LLVM_LOCAL_RPATH}")
++    #set_property(TARGET ${name} PROPERTY INSTALL_RPATH "${LLVM_LOCAL_RPATH}")
+   endif()
+ 
+   if(DEFINED windows_resource_file)
+@@ -2311,8 +2311,8 @@ function(llvm_setup_rpath name)
+   endif()
+ 
+   if (APPLE)
+-    set(_install_name_dir INSTALL_NAME_DIR "@rpath")
+-    set(_install_rpath "@loader_path/../lib${LLVM_LIBDIR_SUFFIX}" ${extra_libdir})
++    #set(_install_name_dir INSTALL_NAME_DIR "@rpath")
++    #set(_install_rpath "@loader_path/../lib${LLVM_LIBDIR_SUFFIX}" ${extra_libdir})
+   elseif(${CMAKE_SYSTEM_NAME} MATCHES "AIX" AND BUILD_SHARED_LIBS)
+     # $ORIGIN is not interpreted at link time by aix ld.
+     # Since BUILD_SHARED_LIBS is only recommended for use by developers,
+@@ -2320,15 +2320,15 @@ function(llvm_setup_rpath name)
+     # FIXME: update this when there is better solution.
+     set(_install_rpath "${LLVM_LIBRARY_OUTPUT_INTDIR}" "${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}" ${extra_libdir})
+   elseif(UNIX)
+-    set(_install_rpath "\$ORIGIN/../lib${LLVM_LIBDIR_SUFFIX}" ${extra_libdir})
++    # set(_install_rpath "\$ORIGIN/../lib${LLVM_LIBDIR_SUFFIX}" ${extra_libdir})
+     if(${CMAKE_SYSTEM_NAME} MATCHES "(FreeBSD|DragonFly)")
+       set_property(TARGET ${name} APPEND_STRING PROPERTY
+                    LINK_FLAGS " -Wl,-z,origin ")
+     endif()
+     if(LLVM_LINKER_IS_GNULD)
+       # $ORIGIN is not interpreted at link time by ld.bfd
+-      set_property(TARGET ${name} APPEND_STRING PROPERTY
+-                   LINK_FLAGS " -Wl,-rpath-link,${LLVM_LIBRARY_OUTPUT_INTDIR} ")
++      # set_property(TARGET ${name} APPEND_STRING PROPERTY
++      #              LINK_FLAGS " -Wl,-rpath-link,${LLVM_LIBRARY_OUTPUT_INTDIR} ")
+     endif()
+   else()
+     return()
+diff --git a/llvm/cmake/modules/CheckAtomic.cmake b/llvm/cmake/modules/CheckAtomic.cmake
+index f11cadf39..ad9604961 100644
+--- a/llvm/cmake/modules/CheckAtomic.cmake
++++ b/llvm/cmake/modules/CheckAtomic.cmake
+@@ -41,7 +41,7 @@ endfunction(check_working_cxx_atomics64)
+ 
+ 
+ # Check for (non-64-bit) atomic operations.
+-if(MSVC)
++if(MSVC OR True)
+   set(HAVE_CXX_ATOMICS_WITHOUT_LIB True)
+ elseif(LLVM_COMPILER_IS_GCC_COMPATIBLE OR CMAKE_CXX_COMPILER_ID MATCHES "XL")
+   # First check if atomics work without the library.
+@@ -62,7 +62,7 @@ elseif(LLVM_COMPILER_IS_GCC_COMPATIBLE OR CMAKE_CXX_COMPILER_ID MATCHES "XL")
+ endif()
+ 
+ # Check for 64 bit atomic operations.
+-if(MSVC)
++if(MSVC OR True)
+   set(HAVE_CXX_ATOMICS64_WITHOUT_LIB True)
+ elseif(LLVM_COMPILER_IS_GCC_COMPATIBLE OR CMAKE_CXX_COMPILER_ID MATCHES "XL")
+   # First check if atomics work without the library.
+diff --git a/llvm/lib/ExecutionEngine/Orc/MemoryMapper.cpp b/llvm/lib/ExecutionEngine/Orc/MemoryMapper.cpp
+index b457c7297..ea850d028 100644
+--- a/llvm/lib/ExecutionEngine/Orc/MemoryMapper.cpp
++++ b/llvm/lib/ExecutionEngine/Orc/MemoryMapper.cpp
+@@ -215,7 +215,7 @@ SharedMemoryMapper::Create(ExecutorProcessControl &EPC, SymbolAddrs SAs) {
+ 
+ void SharedMemoryMapper::reserve(size_t NumBytes,
+                                  OnReservedFunction OnReserved) {
+-#if (defined(LLVM_ON_UNIX) && !defined(__ANDROID__)) || defined(_WIN32)
++#if (defined(LLVM_ON_UNIX) && !defined(__ANDROID__) && !defined(__wasm32__)) || defined(_WIN32)
+ 
+   EPC.callSPSWrapperAsync<
+       rt::SPSExecutorSharedMemoryMapperServiceReserveSignature>(
+diff --git a/llvm/lib/LTO/CMakeLists.txt b/llvm/lib/LTO/CMakeLists.txt
+index ca9ca12d2..7d94e4a96 100644
+--- a/llvm/lib/LTO/CMakeLists.txt
++++ b/llvm/lib/LTO/CMakeLists.txt
+@@ -1,4 +1,5 @@
+-add_llvm_component_library(LLVMLTO
++#add_llvm_component_library(LLVMLTO
++add_llvm_library(LLVMLTO STATIC
+   LTO.cpp
+   LTOBackend.cpp
+   LTOModule.cpp
+diff --git a/llvm/lib/Support/Unix/Memory.inc b/llvm/lib/Support/Unix/Memory.inc
+index 4c8f6b2ea..deda5b46d 100644
+--- a/llvm/lib/Support/Unix/Memory.inc
++++ b/llvm/lib/Support/Unix/Memory.inc
+@@ -193,8 +193,11 @@ std::error_code Memory::protectMappedMemory(const MemoryBlock &M,
+   }
+ #endif
+ 
++#ifdef __wasm32__
++  int Result = 0;
++#else
+   int Result = ::mprotect((void *)Start, End - Start, Protect);
+-
++#endif
+   if (Result != 0)
+     return std::error_code(errno, std::generic_category());
+ 
+diff --git a/llvm/lib/Support/Unix/Path.inc b/llvm/lib/Support/Unix/Path.inc
+index 3efcad4f2..1a4438410 100644
+--- a/llvm/lib/Support/Unix/Path.inc
++++ b/llvm/lib/Support/Unix/Path.inc
+@@ -74,7 +74,7 @@ extern char **environ;
+ 
+ #include <sys/types.h>
+ #if !defined(__APPLE__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) &&   \
+-    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX)
++    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX) && !defined(__wasm32__)
+ #include <sys/statvfs.h>
+ #define STATVFS statvfs
+ #define FSTATVFS fstatvfs
+@@ -103,6 +103,8 @@ extern char **environ;
+ // the typedef prior to including <sys/vmount.h> to work around this issue.
+ typedef uint_t uint;
+ #include <sys/vmount.h>
++#elif defined(__wasm32__)
++//nothing
+ #else
+ #include <sys/mount.h>
+ #endif
+@@ -129,7 +131,7 @@ const file_t kInvalidFile = -1;
+ #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) ||     \
+     defined(__minix) || defined(__FreeBSD_kernel__) || defined(__linux__) ||   \
+     defined(__CYGWIN__) || defined(__DragonFly__) || defined(_AIX) ||          \
+-    defined(__GNU__) || (defined(__sun__) && defined(__svr4__))
++    defined(__GNU__) || (defined(__sun__) && defined(__svr4__) || defined(__wasm32__))
+ static int test_dir(char ret[PATH_MAX], const char *dir, const char *bin) {
+   struct stat sb;
+   char fullpath[PATH_MAX];
+@@ -250,7 +252,7 @@ std::string getMainExecutableImpl(const char *argv0, void *MainAddr) {
+   // If we don't have procfs mounted, fall back to argv[0]
+   if (getprogpath(exe_path, argv0) != NULL)
+     return exe_path;
+-#elif defined(__linux__) || defined(__CYGWIN__) || defined(__gnu_hurd__)
++#elif defined(__linux__) || defined(__CYGWIN__) || defined(__gnu_hurd__) || defined(__wasm32__)
+   char exe_path[PATH_MAX];
+   const char *aPath = "/proc/self/exe";
+   if (sys::fs::exists(aPath)) {
+@@ -350,6 +352,9 @@ UniqueID file_status::getUniqueID() const {
+ uint32_t file_status::getLinkCount() const { return fs_st_nlinks; }
+ 
+ ErrorOr<space_info> disk_space(const Twine &Path) {
++#ifdef __wasm32__
++  return std::error_code(ENOTSUP, std::generic_category());
++#else
+   struct STATVFS Vfs;
+   if (::STATVFS(const_cast<char *>(Path.str().c_str()), &Vfs))
+     return std::error_code(errno, std::generic_category());
+@@ -359,6 +364,7 @@ ErrorOr<space_info> disk_space(const Twine &Path) {
+   SpaceInfo.free = static_cast<uint64_t>(Vfs.f_bfree) * FrSize;
+   SpaceInfo.available = static_cast<uint64_t>(Vfs.f_bavail) * FrSize;
+   return SpaceInfo;
++#endif
+ }
+ 
+ std::error_code current_path(SmallVectorImpl<char> &result) {
+@@ -470,7 +476,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
+ 
+   return std::error_code();
+ }
+-
++#ifndef __wasm32__
+ static bool is_local_impl(struct STATVFS &Vfs) {
+ #if defined(__linux__) || defined(__GNU__)
+ #ifndef NFS_SUPER_MAGIC
+@@ -554,22 +560,30 @@ static bool is_local_impl(struct STATVFS &Vfs) {
+   return !!(STATVFS_F_FLAG(Vfs) & MNT_LOCAL);
+ #endif
+ }
+-
++#endif
+ std::error_code is_local(const Twine &Path, bool &Result) {
++#ifdef __wasm32__
++  Result = true;
++#else
+   struct STATVFS Vfs;
+   if (::STATVFS(const_cast<char *>(Path.str().c_str()), &Vfs))
+     return std::error_code(errno, std::generic_category());
+ 
+   Result = is_local_impl(Vfs);
++#endif
+   return std::error_code();
+ }
+ 
+ std::error_code is_local(int FD, bool &Result) {
++#ifdef __wasm32__
++  Result = true;
++#else
+   struct STATVFS Vfs;
+   if (::FSTATVFS(FD, &Vfs))
+     return std::error_code(errno, std::generic_category());
+ 
+   Result = is_local_impl(Vfs);
++#endif
+   return std::error_code();
+ }
+ 
+@@ -767,23 +781,30 @@ std::error_code status(int FD, file_status &Result) {
+ unsigned getUmask() {
+   // Chose arbitary new mask and reset the umask to the old mask.
+   // umask(2) never fails so ignore the return of the second call.
++  #ifdef __wasm32__
++  return 0777;
++  #else
+   unsigned Mask = ::umask(0);
+   (void)::umask(Mask);
+   return Mask;
++  #endif
+ }
+ 
+ std::error_code setPermissions(const Twine &Path, perms Permissions) {
++  #ifndef __wasm32__
+   SmallString<128> PathStorage;
+   StringRef P = Path.toNullTerminatedStringRef(PathStorage);
+-
+   if (::chmod(P.begin(), Permissions))
+     return std::error_code(errno, std::generic_category());
++  #endif
+   return std::error_code();
+ }
+ 
+ std::error_code setPermissions(int FD, perms Permissions) {
++  #ifndef __wasm32__
+   if (::fchmod(FD, Permissions))
+     return std::error_code(errno, std::generic_category());
++  #endif
+   return std::error_code();
+ }
+ 
+@@ -875,7 +896,7 @@ void mapped_file_region::dontNeedImpl() {
+   assert(Mode == mapped_file_region::readonly);
+   if (!Mapping)
+     return;
+-#if defined(__MVS__) || defined(_AIX)
++#if defined(__MVS__) || defined(_AIX) || defined(__wasm32__)
+     // If we don't have madvise, or it isn't beneficial, treat this as a no-op.
+ #elif defined(POSIX_MADV_DONTNEED)
+   ::posix_madvise(Mapping, Size, POSIX_MADV_DONTNEED);
+@@ -1210,6 +1231,7 @@ Expected<size_t> readNativeFileSlice(file_t FD, MutableArrayRef<char> Buf,
+ }
+ 
+ std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
++  #ifndef __wasm32__
+   auto Start = std::chrono::steady_clock::now();
+   auto End = Start + Timeout;
+   do {
+@@ -1226,10 +1248,14 @@ std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
+       return std::error_code(Error, std::generic_category());
+     usleep(1000);
+   } while (std::chrono::steady_clock::now() < End);
++  #endif
+   return make_error_code(errc::no_lock_available);
+ }
+ 
+ std::error_code lockFile(int FD) {
++  #ifdef __wasm32__
++  return std::error_code(ENOTSUP, std::generic_category());
++  #else
+   struct flock Lock;
+   memset(&Lock, 0, sizeof(Lock));
+   Lock.l_type = F_WRLCK;
+@@ -1240,9 +1266,13 @@ std::error_code lockFile(int FD) {
+     return std::error_code();
+   int Error = errno;
+   return std::error_code(Error, std::generic_category());
++  #endif
+ }
+ 
+ std::error_code unlockFile(int FD) {
++  #ifdef __wasm32__
++  return std::error_code(ENOTSUP, std::generic_category());
++  #else
+   struct flock Lock;
+   Lock.l_type = F_UNLCK;
+   Lock.l_whence = SEEK_SET;
+@@ -1251,6 +1281,7 @@ std::error_code unlockFile(int FD) {
+   if (::fcntl(FD, F_SETLK, &Lock) != -1)
+     return std::error_code();
+   return std::error_code(errno, std::generic_category());
++  #endif
+ }
+ 
+ std::error_code closeFile(file_t &F) {
+@@ -1322,10 +1353,12 @@ std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
+ }
+ 
+ std::error_code changeFileOwnership(int FD, uint32_t Owner, uint32_t Group) {
++  #ifndef __wasm32__
+   auto FChown = [&]() { return ::fchown(FD, Owner, Group); };
+   // Retry if fchown call fails due to interruption.
+   if ((sys::RetryAfterSignal(-1, FChown)) < 0)
+     return std::error_code(errno, std::generic_category());
++  #endif
+   return std::error_code();
+ }
+ 
+diff --git a/llvm/lib/Support/Unix/Process.inc b/llvm/lib/Support/Unix/Process.inc
+index 2babf0794..22c122d7f 100644
+--- a/llvm/lib/Support/Unix/Process.inc
++++ b/llvm/lib/Support/Unix/Process.inc
+@@ -137,7 +137,7 @@ void Process::GetTimeUsage(TimePoint<> &elapsed,
+ // their operation. To prevent the disk from filling up, this function
+ // does what's necessary to prevent their generation.
+ void Process::PreventCoreFiles() {
+-#if HAVE_SETRLIMIT
++#if HAVE_SETRLIMIT && !defined(__wasm32__)
+   struct rlimit rlim;
+   rlim.rlim_cur = rlim.rlim_max = 0;
+   setrlimit(RLIMIT_CORE, &rlim);
+diff --git a/llvm/lib/Support/Unix/Program.inc b/llvm/lib/Support/Unix/Program.inc
+index 897e22711..5d0f57513 100644
+--- a/llvm/lib/Support/Unix/Program.inc
++++ b/llvm/lib/Support/Unix/Program.inc
+@@ -144,6 +144,7 @@ static bool RedirectIO_PS(const std::string *Path, int FD, std::string *ErrMsg,
+ static void TimeOutHandler(int Sig) {}
+ 
+ static void SetMemoryLimits(unsigned size) {
++#ifndef __wasm32__
+ #if HAVE_SYS_RESOURCE_H && HAVE_GETRLIMIT && HAVE_SETRLIMIT
+   struct rlimit r;
+   __typeof__(r.rlim_cur) limit = (__typeof__(r.rlim_cur))(size)*1048576;
+@@ -159,6 +160,7 @@ static void SetMemoryLimits(unsigned size) {
+   setrlimit(RLIMIT_RSS, &r);
+ #endif
+ #endif
++#endif
+ }
+ 
+ static std::vector<const char *>
+@@ -312,6 +314,7 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
+ 
+     // Execute!
+     std::string PathStr = std::string(Program);
++    printf(">>> calling execve here\n");
+     if (Envp != nullptr)
+       execve(PathStr.c_str(), const_cast<char **>(Argv),
+              const_cast<char **>(Envp));
+diff --git a/llvm/lib/Support/Unix/Signals.inc b/llvm/lib/Support/Unix/Signals.inc
+index 05a733521..56f33d739 100644
+--- a/llvm/lib/Support/Unix/Signals.inc
++++ b/llvm/lib/Support/Unix/Signals.inc
+@@ -77,6 +77,10 @@
+ #endif
+ #endif
+ 
++#if defined(__wasm32__) && defined(HAVE_SIGALTSTACK)
++#undef HAVE_SIGALTSTACK
++#endif
++
+ using namespace llvm;
+ 
+ static void SignalHandler(int Sig);     // defined below.
+diff --git a/llvm/lib/Support/Unix/Unix.h b/llvm/lib/Support/Unix/Unix.h
+index 1599241a3..f003b3376 100644
+--- a/llvm/lib/Support/Unix/Unix.h
++++ b/llvm/lib/Support/Unix/Unix.h
+@@ -49,6 +49,11 @@
+ # include <fcntl.h>
+ #endif
+ 
++#ifdef __wasm32__
++pid_t wait (int *);
++pid_t wait4 (pid_t, int *, int, struct rusage *);
++#endif
++
+ /// This function builds an error message into \p ErrMsg using the \p prefix
+ /// string and the Unix error number given by \p errnum. If errnum is -1, the
+ /// default then the value of errno is used.
+diff --git a/llvm/lib/Transforms/Hello/CMakeLists.txt b/llvm/lib/Transforms/Hello/CMakeLists.txt
+index c4f10247c..79f7d6ff8 100644
+--- a/llvm/lib/Transforms/Hello/CMakeLists.txt
++++ b/llvm/lib/Transforms/Hello/CMakeLists.txt
+@@ -2,7 +2,7 @@
+ # from the hello plugin.
+ if( NOT LLVM_REQUIRES_RTTI )
+   if( NOT LLVM_REQUIRES_EH )
+-    set(LLVM_EXPORTED_SYMBOL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/Hello.exports)
++#    set(LLVM_EXPORTED_SYMBOL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/Hello.exports)
+   endif()
+ endif()
+ 
+@@ -10,11 +10,11 @@ if(WIN32 OR CYGWIN)
+   set(LLVM_LINK_COMPONENTS Core Support)
+ endif()
+ 
+-add_llvm_library( LLVMHello MODULE BUILDTREE_ONLY
+-  Hello.cpp
++#add_llvm_library( LLVMHello MODULE BUILDTREE_ONLY
++#  Hello.cpp
+ 
+-  DEPENDS
+-  intrinsics_gen
+-  PLUGIN_TOOL
+-  opt
+-  )
++#  DEPENDS
++#  intrinsics_gen
++#  PLUGIN_TOOL
++#  opt
++#  )
+diff --git a/llvm/tools/CMakeLists.txt b/llvm/tools/CMakeLists.txt
+index c6116ac81..c77d236f9 100644
+--- a/llvm/tools/CMakeLists.txt
++++ b/llvm/tools/CMakeLists.txt
+@@ -17,7 +17,7 @@ if(NOT LLVM_USE_INTEL_JITEVENTS )
+   set(LLVM_TOOL_LLVM_JITLISTENER_BUILD Off)
+ endif()
+ 
+-if(CYGWIN OR NOT LLVM_ENABLE_PIC)
++if(CYGWIN OR NOT LLVM_ENABLE_PIC OR TRUE)
+   set(LLVM_TOOL_LTO_BUILD Off)
+ endif()
+ 
+@@ -28,11 +28,11 @@ endif()
+ # Add LTO, llvm-ar, llvm-config, and llvm-profdata before clang, ExternalProject
+ # requires targets specified in DEPENDS to exist before the call to
+ # ExternalProject_Add.
+-add_llvm_tool_subdirectory(lto)
++#add_llvm_tool_subdirectory(lto)
+ add_llvm_tool_subdirectory(gold)
+ add_llvm_tool_subdirectory(llvm-ar)
+ add_llvm_tool_subdirectory(llvm-config)
+-add_llvm_tool_subdirectory(llvm-lto)
++#add_llvm_tool_subdirectory(llvm-lto)
+ add_llvm_tool_subdirectory(llvm-profdata)
+ 
+ # Projects supported via LLVM_EXTERNAL_*_SOURCE_DIR need to be explicitly
+diff --git a/llvm/tools/lli/lli.cpp b/llvm/tools/lli/lli.cpp
+index c9b77e23b..98d932e7d 100644
+--- a/llvm/tools/lli/lli.cpp
++++ b/llvm/tools/lli/lli.cpp
+@@ -427,7 +427,8 @@ Expected<std::unique_ptr<orc::ExecutorProcessControl>> launchRemote();
+ //===----------------------------------------------------------------------===//
+ // main Driver function
+ //
+-int main(int argc, char **argv, char * const *envp) {
++int main(int argc, char **argv/*, char * const *envp*/) {
++  char * const *envp = environ;
+   InitLLVM X(argc, argv);
+ 
+   if (argc > 1)
+diff --git a/llvm/tools/llvm-lto/CMakeLists.txt b/llvm/tools/llvm-lto/CMakeLists.txt
+index 988085b3c..1d56350e9 100644
+--- a/llvm/tools/llvm-lto/CMakeLists.txt
++++ b/llvm/tools/llvm-lto/CMakeLists.txt
+@@ -17,8 +17,8 @@ set(LLVM_LINK_COMPONENTS
+   TargetParser
+   )
+ 
+-add_llvm_tool(llvm-lto
+-  llvm-lto.cpp
+-
+-  DEPENDS intrinsics_gen
+-  )
++#add_llvm_tool(llvm-lto
++#  llvm-lto.cpp
++#
++#  DEPENDS intrinsics_gen
++#  )
+diff --git a/third-party/benchmark/src/cycleclock.h b/third-party/benchmark/src/cycleclock.h
+index d65d32a39..3694fb30c 100644
+--- a/third-party/benchmark/src/cycleclock.h
++++ b/third-party/benchmark/src/cycleclock.h
+@@ -177,6 +177,10 @@ inline BENCHMARK_ALWAYS_INLINE int64_t Now() {
+   struct timeval tv;
+   gettimeofday(&tv, nullptr);
+   return static_cast<int64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
++#elif defined(__wasm32__) || defined(__wasm64__)
++  struct timeval tv;
++  gettimeofday(&tv, nullptr);
++  return static_cast<int64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
+ #elif defined(__s390__)  // Covers both s390 and s390x.
+   // Return the CPU clock.
+   uint64_t tsc;
+-- 
+2.43.0
+
+
+From bb9592d17f49259cf5b311a28e0c0819e4739576 Mon Sep 17 00:00:00 2001
+From: "M.Amin Rayej" <m.amin.rayej@gmail.com>
+Date: Mon, 23 Sep 2024 21:25:08 +0330
+Subject: [PATCH 2/3] fix errors
+
+---
+ clang/lib/Driver/ToolChains/WebAssembly.cpp | 50 ++++++++++-----------
+ llvm/include/llvm/Support/SwapByteOrder.h   |  2 +-
+ 2 files changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/WebAssembly.cpp b/clang/lib/Driver/ToolChains/WebAssembly.cpp
+index a1c4cd9ef..ebf1229d6 100644
+--- a/clang/lib/Driver/ToolChains/WebAssembly.cpp
++++ b/clang/lib/Driver/ToolChains/WebAssembly.cpp
+@@ -131,31 +131,31 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
+                                          Linker, CmdArgs, Inputs, Output));
+ 
+   // When optimizing, if wasm-opt is available, run it.
+-  if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
+-    auto WasmOptPath = ToolChain.GetProgramPath("wasm-opt");
+-    if (WasmOptPath != "wasm-opt") {
+-      StringRef OOpt = "s";
+-      if (A->getOption().matches(options::OPT_O4) ||
+-          A->getOption().matches(options::OPT_Ofast))
+-        OOpt = "4";
+-      else if (A->getOption().matches(options::OPT_O0))
+-        OOpt = "0";
+-      else if (A->getOption().matches(options::OPT_O))
+-        OOpt = A->getValue();
+-
+-      if (OOpt != "0") {
+-        const char *WasmOpt = Args.MakeArgString(WasmOptPath);
+-        ArgStringList CmdArgs;
+-        CmdArgs.push_back(Output.getFilename());
+-        CmdArgs.push_back(Args.MakeArgString(llvm::Twine("-O") + OOpt));
+-        CmdArgs.push_back("-o");
+-        CmdArgs.push_back(Output.getFilename());
+-        C.addCommand(std::make_unique<Command>(
+-            JA, *this, ResponseFileSupport::AtFileCurCP(), WasmOpt, CmdArgs,
+-            Inputs, Output));
+-      }
+-    }
+-  }
++  // if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
++  //   auto WasmOptPath = ToolChain.GetProgramPath("wasm-opt");
++  //   if (WasmOptPath != "wasm-opt") {
++  //     StringRef OOpt = "s";
++  //     if (A->getOption().matches(options::OPT_O4) ||
++  //         A->getOption().matches(options::OPT_Ofast))
++  //       OOpt = "4";
++  //     else if (A->getOption().matches(options::OPT_O0))
++  //       OOpt = "0";
++  //     else if (A->getOption().matches(options::OPT_O))
++  //       OOpt = A->getValue();
++
++  //     if (OOpt != "0") {
++  //       const char *WasmOpt = Args.MakeArgString(WasmOptPath);
++  //       ArgStringList CmdArgs;
++  //       CmdArgs.push_back(Output.getFilename());
++  //       CmdArgs.push_back(Args.MakeArgString(llvm::Twine("-O") + OOpt));
++  //       CmdArgs.push_back("-o");
++  //       CmdArgs.push_back(Output.getFilename());
++  //       C.addCommand(std::make_unique<Command>(
++  //           JA, *this, ResponseFileSupport::AtFileCurCP(), WasmOpt, CmdArgs,
++  //           Inputs, Output));
++  //     }
++  //   }
++  // }
+ }
+ 
+ /// Given a base library directory, append path components to form the
+diff --git a/llvm/include/llvm/Support/SwapByteOrder.h b/llvm/include/llvm/Support/SwapByteOrder.h
+index 9dd08665b..ce38f5d99 100644
+--- a/llvm/include/llvm/Support/SwapByteOrder.h
++++ b/llvm/include/llvm/Support/SwapByteOrder.h
+@@ -20,7 +20,7 @@
+ #include <type_traits>
+ 
+ #if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) ||            \
+-    defined(__Fuchsia__) || defined(__EMSCRIPTEN__)
++    defined(__Fuchsia__) || defined(__EMSCRIPTEN__) || defined(__wasm32)
+ #include <endian.h>
+ #elif defined(_AIX)
+ #include <sys/machine.h>
+-- 
+2.43.0
+
+
+From ff72096a1a78b8762ff508f8e65f7868d377728e Mon Sep 17 00:00:00 2001
+From: "M.Amin Rayej" <m.amin.rayej@gmail.com>
+Date: Fri, 27 Sep 2024 13:57:12 +0330
+Subject: [PATCH 3/3] reenable wasm-opt
+
+---
+ clang/lib/Driver/ToolChains/WebAssembly.cpp | 53 +++++++++++----------
+ 1 file changed, 28 insertions(+), 25 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/WebAssembly.cpp b/clang/lib/Driver/ToolChains/WebAssembly.cpp
+index ebf1229d6..5a49f2243 100644
+--- a/clang/lib/Driver/ToolChains/WebAssembly.cpp
++++ b/clang/lib/Driver/ToolChains/WebAssembly.cpp
+@@ -131,31 +131,34 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
+                                          Linker, CmdArgs, Inputs, Output));
+ 
+   // When optimizing, if wasm-opt is available, run it.
+-  // if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
+-  //   auto WasmOptPath = ToolChain.GetProgramPath("wasm-opt");
+-  //   if (WasmOptPath != "wasm-opt") {
+-  //     StringRef OOpt = "s";
+-  //     if (A->getOption().matches(options::OPT_O4) ||
+-  //         A->getOption().matches(options::OPT_Ofast))
+-  //       OOpt = "4";
+-  //     else if (A->getOption().matches(options::OPT_O0))
+-  //       OOpt = "0";
+-  //     else if (A->getOption().matches(options::OPT_O))
+-  //       OOpt = A->getValue();
+-
+-  //     if (OOpt != "0") {
+-  //       const char *WasmOpt = Args.MakeArgString(WasmOptPath);
+-  //       ArgStringList CmdArgs;
+-  //       CmdArgs.push_back(Output.getFilename());
+-  //       CmdArgs.push_back(Args.MakeArgString(llvm::Twine("-O") + OOpt));
+-  //       CmdArgs.push_back("-o");
+-  //       CmdArgs.push_back(Output.getFilename());
+-  //       C.addCommand(std::make_unique<Command>(
+-  //           JA, *this, ResponseFileSupport::AtFileCurCP(), WasmOpt, CmdArgs,
+-  //           Inputs, Output));
+-  //     }
+-  //   }
+-  // }
++  const char* skip_wasm_opt = std::getenv("SKIP_WASM_OPT");
++  if (!skip_wasm_opt) {
++    if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
++      auto WasmOptPath = ToolChain.GetProgramPath("wasm-opt");
++      if (WasmOptPath != "wasm-opt") {
++        StringRef OOpt = "s";
++        if (A->getOption().matches(options::OPT_O4) ||
++            A->getOption().matches(options::OPT_Ofast))
++          OOpt = "4";
++        else if (A->getOption().matches(options::OPT_O0))
++          OOpt = "0";
++        else if (A->getOption().matches(options::OPT_O))
++          OOpt = A->getValue();
++
++        if (OOpt != "0") {
++          const char *WasmOpt = Args.MakeArgString(WasmOptPath);
++          ArgStringList CmdArgs;
++          CmdArgs.push_back(Output.getFilename());
++          CmdArgs.push_back(Args.MakeArgString(llvm::Twine("-O") + OOpt));
++          CmdArgs.push_back("-o");
++          CmdArgs.push_back(Output.getFilename());
++          C.addCommand(std::make_unique<Command>(
++              JA, *this, ResponseFileSupport::AtFileCurCP(), WasmOpt, CmdArgs,
++              Inputs, Output));
++        }
++      }
++    }
++  }
+ }
+ 
+ /// Given a base library directory, append path components to form the
+-- 
+2.43.0
+
