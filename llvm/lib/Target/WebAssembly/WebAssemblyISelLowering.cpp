@@ -1948,9 +1948,7 @@ WebAssemblyTargetLowering::LowerGlobalTLSAddress(SDValue Op,
   // Currently only Emscripten supports dynamic linking with threads. Therefore,
   // on other targets, if we have thread-local storage, only the local-exec
   // model is possible.
-  auto model = Subtarget->getTargetTriple().isOSEmscripten()
-                   ? GV->getThreadLocalMode()
-                   : GlobalValue::LocalExecTLSModel;
+  auto model = GV->getThreadLocalMode();
 
   // Unsupported TLS modes
   assert(model != GlobalValue::NotThreadLocal);
