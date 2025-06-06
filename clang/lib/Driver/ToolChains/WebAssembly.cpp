@@ -64,7 +64,7 @@ static bool TargetBuildsComponents(const llvm::Triple &TargetTriple) {
   // WASIp2 and above are all based on components, so test for WASI but exclude
   // the original `wasi` target in addition to the `wasip1` name.
   return TargetTriple.isOSWASI() && TargetTriple.getOSName() != "wasip1" &&
-         TargetTriple.getOSName() != "wasi";
+         TargetTriple.getOSName() != "wasi" && TargetTriple.getOSName() != "wasix";
 }
 
 static bool WantsPthread(const llvm::Triple &Triple, const ArgList &Args) {
