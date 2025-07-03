@@ -1082,7 +1082,7 @@ macro(add_llvm_executable name)
       set_property(TARGET ${name} PROPERTY BUILD_WITH_INSTALL_RPATH ON)
     endif()
 
-    set_property(TARGET ${name} PROPERTY INSTALL_RPATH "${LLVM_LOCAL_RPATH}")
+    # set_property(TARGET ${name} PROPERTY INSTALL_RPATH "${LLVM_LOCAL_RPATH}")
   endif()
 
   if(DEFINED windows_resource_file)

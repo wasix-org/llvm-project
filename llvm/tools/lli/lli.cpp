@@ -420,7 +420,8 @@ Expected<std::unique_ptr<orc::ExecutorProcessControl>> launchRemote();
 //===----------------------------------------------------------------------===//
 // main Driver function
 //
-int main(int argc, char **argv, char * const *envp) {
+int main(int argc, char **argv/*, char * const *envp*/) {
+  char * const *envp = environ;
   InitLLVM X(argc, argv);
 
   if (argc > 1)

@@ -193,7 +193,11 @@ std::error_code Memory::protectMappedMemory(const MemoryBlock &M,
   }
 #endif
 
+#ifdef __wasi__
+  int Result = 0;
+#else
   int Result = ::mprotect((void *)Start, End - Start, Protect);
+#endif
 
   if (Result != 0)
     return errnoAsErrorCode();

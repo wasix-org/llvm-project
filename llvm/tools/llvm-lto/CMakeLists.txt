@@ -17,8 +17,8 @@ set(LLVM_LINK_COMPONENTS
   TargetParser
   )
 
-add_llvm_tool(llvm-lto
-  llvm-lto.cpp
-
-  DEPENDS intrinsics_gen
-  )
+#add_llvm_tool(llvm-lto
+#  llvm-lto.cpp
+#
+#  DEPENDS intrinsics_gen
+#  )

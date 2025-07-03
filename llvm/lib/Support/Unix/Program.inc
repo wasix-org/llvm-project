@@ -138,6 +138,7 @@ static bool RedirectIO_PS(const std::string *Path, int FD, std::string *ErrMsg,
 static void TimeOutHandler(int Sig) {}
 
 static void SetMemoryLimits(unsigned size) {
+#ifndef __wasi__
   struct rlimit r;
   __typeof__(r.rlim_cur) limit = (__typeof__(r.rlim_cur))(size)*1048576;
 
@@ -151,6 +152,7 @@ static void SetMemoryLimits(unsigned size) {
   r.rlim_cur = limit;
   setrlimit(RLIMIT_RSS, &r);
 #endif
+#endif // __wasi__
 }
 
 static std::vector<const char *>
@@ -268,7 +270,7 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
                        "limits and detaching processes are not supported.");
     return false;
   }
-#endif __wasi__
+#endif // __wasi__
 #endif // defined(HAVE_POSIX_SPAWN) || defined(__wasi__)
 
   // Create a child process.

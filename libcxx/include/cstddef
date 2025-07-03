@@ -41,6 +41,12 @@ Types:
 
 #  include <stddef.h>
 
+#  ifdef __wasi__
+typedef unsigned long size_t;
+typedef long ptrdiff_t;
+typedef long long intmax_t;
+#  endif // __wasi__
+
 #  ifndef _LIBCPP_STDDEF_H
 #   error <cstddef> tried including <stddef.h> but didn't find libc++'s <stddef.h> header. \
           This usually means that your header search paths are not configured properly. \

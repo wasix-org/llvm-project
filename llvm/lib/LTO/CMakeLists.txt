@@ -1,4 +1,4 @@
-add_llvm_component_library(LLVMLTO
+add_llvm_component_library(LLVMLTO STATIC
   LTO.cpp
   LTOBackend.cpp
   LTOModule.cpp

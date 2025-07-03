@@ -69,7 +69,8 @@ extern char **environ;
 
 #include <sys/types.h>
 #if !defined(__APPLE__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) &&   \
-    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX)
+    !defined(__linux__) && !defined(__FreeBSD_kernel__) && !defined(_AIX) &&   \
+    !defined(__wasi__)
 #include <sys/statvfs.h>
 #define STATVFS statvfs
 #define FSTATVFS fstatvfs
@@ -98,6 +99,8 @@ extern char **environ;
 // the typedef prior to including <sys/vmount.h> to work around this issue.
 typedef uint_t uint;
 #include <sys/vmount.h>
+#elif defined(__wasi__)
+// Nothing
 #else
 #include <sys/mount.h>
 #endif
@@ -124,7 +127,8 @@ const file_t kInvalidFile = -1;
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) ||      \
     defined(__FreeBSD_kernel__) || defined(__linux__) || defined(__CYGWIN__) || \
     defined(__DragonFly__) || defined(_AIX) || defined(__GNU__) ||              \
-    (defined(__sun__) && defined(__svr4__) || defined(__HAIKU__))
+    (defined(__sun__) && defined(__svr4__) || defined(__HAIKU__)) ||            \
+    defined(__wasi__)
 static int test_dir(char ret[PATH_MAX], const char *dir, const char *bin) {
   struct stat sb;
   char fullpath[PATH_MAX];
@@ -245,7 +249,8 @@ std::string getMainExecutable(const char *argv0, void *MainAddr) {
   // If we don't have procfs mounted, fall back to argv[0]
   if (getprogpath(exe_path, argv0) != NULL)
     return exe_path;
-#elif defined(__linux__) || defined(__CYGWIN__) || defined(__gnu_hurd__)
+#elif defined(__linux__) || defined(__CYGWIN__) || defined(__gnu_hurd__) || \
+      defined(__wasi__)
   char exe_path[PATH_MAX];
   const char *aPath = "/proc/self/exe";
   if (sys::fs::exists(aPath)) {
@@ -350,6 +355,9 @@ UniqueID file_status::getUniqueID() const {
 uint32_t file_status::getLinkCount() const { return fs_st_nlinks; }
 
 ErrorOr<space_info> disk_space(const Twine &Path) {
+#ifdef __wasm32__
+  return std::error_code(ENOTSUP, std::generic_category());
+#else
   struct STATVFS Vfs;
   if (::STATVFS(const_cast<char *>(Path.str().c_str()), &Vfs))
     return errnoAsErrorCode();
@@ -359,6 +367,7 @@ ErrorOr<space_info> disk_space(const Twine &Path) {
   SpaceInfo.free = static_cast<uint64_t>(Vfs.f_bfree) * FrSize;
   SpaceInfo.available = static_cast<uint64_t>(Vfs.f_bavail) * FrSize;
   return SpaceInfo;
+#endif
 }
 
 std::error_code current_path(SmallVectorImpl<char> &result) {
@@ -471,6 +480,7 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
   return std::error_code();
 }
 
+#ifndef __wasi__
 static bool is_local_impl(struct STATVFS &Vfs) {
 #if defined(__linux__) || defined(__GNU__)
 #ifndef NFS_SUPER_MAGIC
@@ -554,22 +564,31 @@ static bool is_local_impl(struct STATVFS &Vfs) {
   return !!(STATVFS_F_FLAG(Vfs) & MNT_LOCAL);
 #endif
 }
+#endif // __wasi__
 
 std::error_code is_local(const Twine &Path, bool &Result) {
+#ifdef __wasi__
+  Result = true;
+#else
   struct STATVFS Vfs;
   if (::STATVFS(const_cast<char *>(Path.str().c_str()), &Vfs))
     return errnoAsErrorCode();
 
   Result = is_local_impl(Vfs);
+#endif // __wasi__
   return std::error_code();
 }
 
 std::error_code is_local(int FD, bool &Result) {
+#ifdef __wasi__
+  Result = true;
+#else
   struct STATVFS Vfs;
   if (::FSTATVFS(FD, &Vfs))
     return errnoAsErrorCode();
 
   Result = is_local_impl(Vfs);
+#endif // __wasi__
   return std::error_code();
 }
 
@@ -765,25 +784,33 @@ std::error_code status(int FD, file_status &Result) {
 }
 
 unsigned getUmask() {
+#ifdef __wasi__
+  return 0x777;
+#else
   // Chose arbitary new mask and reset the umask to the old mask.
   // umask(2) never fails so ignore the return of the second call.
   unsigned Mask = ::umask(0);
   (void)::umask(Mask);
   return Mask;
+#endif // __wasi__
 }
 
 std::error_code setPermissions(const Twine &Path, perms Permissions) {
+#ifndef __wasi__
   SmallString<128> PathStorage;
   StringRef P = Path.toNullTerminatedStringRef(PathStorage);
 
   if (::chmod(P.begin(), Permissions))
     return errnoAsErrorCode();
+#endif // __wasi__
   return std::error_code();
 }
 
 std::error_code setPermissions(int FD, perms Permissions) {
+#ifndef __wasi__
   if (::fchmod(FD, Permissions))
     return errnoAsErrorCode();
+#endif // __wasi__
   return std::error_code();
 }
 
@@ -875,7 +902,7 @@ void mapped_file_region::dontNeedImpl() {
   assert(Mode == mapped_file_region::readonly);
   if (!Mapping)
     return;
-#if defined(__MVS__) || defined(_AIX)
+#if defined(__MVS__) || defined(_AIX) || defined(__wasi__)
     // If we don't have madvise, or it isn't beneficial, treat this as a no-op.
 #elif defined(POSIX_MADV_DONTNEED)
   ::posix_madvise(Mapping, Size, POSIX_MADV_DONTNEED);
@@ -1219,6 +1246,7 @@ Expected<size_t> readNativeFileSlice(file_t FD, MutableArrayRef<char> Buf,
 }
 
 std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
+#ifndef __wasi__
   auto Start = std::chrono::steady_clock::now();
   auto End = Start + Timeout;
   do {
@@ -1235,10 +1263,14 @@ std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
       return std::error_code(Error, std::generic_category());
     usleep(1000);
   } while (std::chrono::steady_clock::now() < End);
+#endif // __wasi__
   return make_error_code(errc::no_lock_available);
 }
 
 std::error_code lockFile(int FD) {
+#ifdef __wasi__
+  return std::error_code(ENOTSUP, std::generic_category());
+#else
   struct flock Lock;
   memset(&Lock, 0, sizeof(Lock));
   Lock.l_type = F_WRLCK;
@@ -1248,9 +1280,13 @@ std::error_code lockFile(int FD) {
   if (::fcntl(FD, F_SETLKW, &Lock) != -1)
     return std::error_code();
   return errnoAsErrorCode();
+#endif // __wasi__
 }
 
 std::error_code unlockFile(int FD) {
+#ifdef __wasi__
+  return std::error_code(ENOTSUP, std::generic_category());
+#else
   struct flock Lock;
   Lock.l_type = F_UNLCK;
   Lock.l_whence = SEEK_SET;
@@ -1259,6 +1295,7 @@ std::error_code unlockFile(int FD) {
   if (::fcntl(FD, F_SETLK, &Lock) != -1)
     return std::error_code();
   return errnoAsErrorCode();
+#endif // __wasi__
 }
 
 std::error_code closeFile(file_t &F) {
@@ -1330,10 +1367,12 @@ std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
 }
 
 std::error_code changeFileOwnership(int FD, uint32_t Owner, uint32_t Group) {
+#ifndef __wasi__
   auto FChown = [&]() { return ::fchown(FD, Owner, Group); };
   // Retry if fchown call fails due to interruption.
   if ((sys::RetryAfterSignal(-1, FChown)) < 0)
     return errnoAsErrorCode();
+#endif // __wasi__
   return std::error_code();
 }
 

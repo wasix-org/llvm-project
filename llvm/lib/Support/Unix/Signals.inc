@@ -78,6 +78,10 @@
 #include <__le_cwi.h>
 #endif
 
+#if defined(__wasi__) && defined(HAVE_SIGALTSTACK)
+#undef HAVE_SIGALTSTACK
+#endif
+
 using namespace llvm;
 
 static void SignalHandler(int Sig);     // defined below.

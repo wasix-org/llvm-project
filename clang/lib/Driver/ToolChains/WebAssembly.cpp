@@ -64,9 +64,11 @@ std::string wasm::Linker::getLinkerPath(const ArgList &Args) const {
 
 static bool TargetBuildsComponents(const llvm::Triple &TargetTriple) {
   // WASIp2 and above are all based on components, so test for WASI but exclude
-  // the original `wasi` target in addition to the `wasip1` name.
+  // the original `wasi` target in addition to the `wasip1` name. WASIX does not
+  // use components either.
   return TargetTriple.isOSWASI() && TargetTriple.getOSName() != "wasip1" &&
-         TargetTriple.getOSName() != "wasi";
+         TargetTriple.getOSName() != "wasi" &&
+         TargetTriple.getOSName() != "wasix";
 }
 
 void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
@@ -168,10 +170,16 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   CmdArgs.push_back("-o");
   CmdArgs.push_back(Output.getFilename());
 
+#ifdef __wasi__
+  // At the time of this implementation, wasm-opt hasn't been ported to WASIX,
+  // so the default is to not run it.
+  bool WasmOptDefault = false;
+#else
   // Don't use wasm-opt by default on `wasip2` as it doesn't have support for
   // components at this time. Retain the historical default otherwise, though,
   // of running `wasm-opt` by default.
   bool WasmOptDefault = !TargetBuildsComponents(ToolChain.getTriple());
+#endif // __wasi__
   bool RunWasmOpt = Args.hasFlag(options::OPT_wasm_opt,
                                  options::OPT_no_wasm_opt, WasmOptDefault);
 

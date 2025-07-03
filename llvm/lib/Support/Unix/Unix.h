@@ -43,6 +43,11 @@
 
 # include <fcntl.h>
 
+#ifdef __wasi__
+pid_t wait (int *);
+pid_t wait4 (pid_t, int *, int, struct rusage *);
+#endif
+
 /// This function builds an error message into \p ErrMsg using the \p prefix
 /// string and the Unix error number given by \p errnum. If errnum is -1, the
 /// default then the value of errno is used.

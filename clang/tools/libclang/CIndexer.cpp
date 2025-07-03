@@ -127,7 +127,7 @@ const std::string &CIndexer::getClangResourcesPath() {
   getClangResourcesPathImplAIX(LibClangPath);
 #else
   bool PathFound = false;
-#if defined(CLANG_HAVE_DLFCN_H) && defined(CLANG_HAVE_DLADDR)
+#if defined(CLANG_HAVE_DLFCN_H) && defined(CLANG_HAVE_DLADDR) && !defined(__wasi__)
   Dl_info info;
   // This silly cast below avoids a C++ warning.
   if (dladdr((void *)(uintptr_t)clang_createTranslationUnit, &info) != 0) {
