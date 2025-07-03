@@ -192,7 +192,7 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
 
   // If this OS has posix_spawn and there is no memory limit being implied, use
   // posix_spawn.  It is more efficient than fork/exec.
-#ifdef HAVE_POSIX_SPAWN
+#if defined(HAVE_POSIX_SPAWN) || defined(__wasi__)
   // Cannot use posix_spawn if you would like to detach the process
   if (MemoryLimit == 0 && !DetachProcess) {
     posix_spawn_file_actions_t FileActionsStore;
@@ -262,7 +262,14 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
 
     return true;
   }
-#endif // HAVE_POSIX_SPAWN
+#ifdef __wasi__
+  else {
+    MakeErrMsg(ErrMsg, "WASIX w/o asyncify does not support forking, so memory "
+                       "limits and detaching processes are not supported.");
+    return false;
+  }
+#endif __wasi__
+#endif // defined(HAVE_POSIX_SPAWN) || defined(__wasi__)
 
   // Create a child process.
   int child = fork();
