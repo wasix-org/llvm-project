@@ -680,7 +680,7 @@ function(llvm_add_library name)
 
   if(NOT ARG_NO_INSTALL_RPATH)
     if(ARG_MODULE OR ARG_SHARED)
-      llvm_setup_rpath(${name})
+      # llvm_setup_rpath(${name})
     endif()
   endif()
 
@@ -1075,14 +1075,14 @@ macro(add_llvm_executable name)
   setup_dependency_debugging(${name} ${LLVM_COMMON_DEPENDS})
 
   if(NOT ARG_NO_INSTALL_RPATH)
-    llvm_setup_rpath(${name})
+    # llvm_setup_rpath(${name})
   elseif(NOT "${LLVM_LOCAL_RPATH}" STREQUAL "")
     # Enable BUILD_WITH_INSTALL_RPATH unless CMAKE_BUILD_RPATH is set.
     if("${CMAKE_BUILD_RPATH}" STREQUAL "")
       set_property(TARGET ${name} PROPERTY BUILD_WITH_INSTALL_RPATH ON)
     endif()
 
-    # set_property(TARGET ${name} PROPERTY INSTALL_RPATH "${LLVM_LOCAL_RPATH}")
+    set_property(TARGET ${name} PROPERTY INSTALL_RPATH "${LLVM_LOCAL_RPATH}")
   endif()
 
   if(DEFINED windows_resource_file)
@@ -2545,15 +2545,15 @@ function(llvm_setup_rpath name)
   # on install at the moment, so BUILD_WITH_INSTALL_RPATH is required.
   if("${CMAKE_BUILD_RPATH}" STREQUAL "")
     if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin|AIX")
-      set_property(TARGET ${name} PROPERTY BUILD_WITH_INSTALL_RPATH ON)
+      # set_property(TARGET ${name} PROPERTY BUILD_WITH_INSTALL_RPATH ON)
     else()
       set_property(TARGET ${name} APPEND PROPERTY BUILD_RPATH "${_build_rpath}")
     endif()
   endif()
 
-  set_target_properties(${name} PROPERTIES
-                        INSTALL_RPATH "${_install_rpath}"
-                        ${_install_name_dir})
+  # set_target_properties(${name} PROPERTIES
+  #                       INSTALL_RPATH "${_install_rpath}"
+  #                       ${_install_name_dir})
 endfunction()
 
 function(setup_dependency_debugging name)

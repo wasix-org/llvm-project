@@ -5,11 +5,11 @@ mkdir build-wasix
 cd build-wasix
 mkdir install
 
-cmake -S ../llvm -B . -G Ninja --toolchain ../wasix-toolchain.cmake
+cmake -S ../llvm -B . -G Ninja --toolchain ../wasix-toolchain.cmake \
 -DLLVM_ENABLE_PROJECTS='clang;lld' \
 -DLLVM_ENABLE_RUNTIMES='' \
 -DCMAKE_INSTALL_PREFIX=$(realpath ./install) \
--DCMAKE_BUILD_TYPE=MINSIZEREL \
+-DCMAKE_BUILD_TYPE=MinSizeRel \
 -DLLVM_TARGETS_TO_BUILD="WebAssembly" \
 -DCMAKE_CXX_COMPILER_WORKS=1 \
 -DLLVM_DEFAULT_TARGET_TRIPLE=wasm32-wasi \
@@ -17,7 +17,7 @@ cmake -S ../llvm -B . -G Ninja --toolchain ../wasix-toolchain.cmake
 -DLLVM_ENABLE_LIBCXX=ON \
 -DNO_INSTALL_RPATH=ON \
 -DCMAKE_BUILD_RPATH=OFF \
--DCMAKE_BUILD_WITH_INSTALL_RPATH=OFF \
+-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
 -DLLVM_BUILD_TESTS=OFF \
 -DLLVM_INCLUDE_TESTS=OFF \
 -DLLVM_INCLUDE_UTILS=OFF \
@@ -25,6 +25,9 @@ cmake -S ../llvm -B . -G Ninja --toolchain ../wasix-toolchain.cmake
 -DLLVM_INCLUDE_EXAMPLES=OFF \
 -DBUILD_SHARED_LIBS=OFF \
 -DLLVM_ENABLE_LTO=OFF \
--DLLVM_ENABLE_PIC=OFF
+-DLLVM_ENABLE_PIC=OFF \
+-DLLVM_LINK_LLVM_DYLIB=OFF \
+-DCLANG_LINK_CLANG_DYLIB=OFF
 
-ninja -C .
+# Don't set the parallel jobs too high unless you have a LOT of RAM.
+ninja -j4

@@ -39,7 +39,9 @@
 #include <sys/time.h>
 #include <time.h>
 
+#ifndef __wasi__
 #include <dlfcn.h>
+#endif
 
 # include <fcntl.h>
 

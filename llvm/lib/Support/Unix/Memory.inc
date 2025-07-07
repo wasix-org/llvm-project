@@ -163,18 +163,20 @@ std::error_code Memory::releaseMappedMemory(MemoryBlock &M) {
 
 std::error_code Memory::protectMappedMemory(const MemoryBlock &M,
                                             unsigned Flags) {
-  static const Align PageSize = Align(Process::getPageSizeEstimate());
   if (M.Address == nullptr || M.AllocatedSize == 0)
     return std::error_code();
 
   if (!Flags)
     return std::error_code(EINVAL, std::generic_category());
 
+#ifndef __wasi__
+  static const Align PageSize = Align(Process::getPageSizeEstimate());
   int Protect = getPosixProtectionFlags(Flags);
   uintptr_t Start =
       alignAddr((const uint8_t *)M.Address - PageSize.value() + 1, PageSize);
   uintptr_t End =
       alignAddr((const uint8_t *)M.Address + M.AllocatedSize, PageSize);
+#endif
 
   bool InvalidateCache = (Flags & MF_EXEC);
 

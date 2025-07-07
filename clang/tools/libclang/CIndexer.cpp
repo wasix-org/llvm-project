@@ -37,7 +37,7 @@
 #elif defined(_AIX)
 #include <errno.h>
 #include <sys/ldr.h>
-#else
+#elif !defined(__wasi__)
 #include <dlfcn.h>
 #endif
 

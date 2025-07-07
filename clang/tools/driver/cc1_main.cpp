@@ -80,7 +80,7 @@ static void LLVMErrorHandler(void *UserData, const char *Message,
   llvm::sys::Process::Exit(GenCrashDiag ? 70 : 1);
 }
 
-#if defined(CLANG_HAVE_RLIMITS) || defined(__wasi__)
+#if defined(CLANG_HAVE_RLIMITS) && !defined(__wasi__)
 /// Attempt to ensure that we have at least 8MiB of usable stack space.
 static void ensureSufficientStack() {
   struct rlimit rlim;

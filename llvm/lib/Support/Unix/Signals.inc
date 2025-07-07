@@ -52,7 +52,9 @@
 #endif
 #include <signal.h>
 #include <sys/stat.h>
+#ifndef __wasi__
 #include <dlfcn.h>
+#endif
 #if HAVE_MACH_MACH_H
 #include <mach/mach.h>
 #endif

@@ -54,7 +54,8 @@
 #define CLANG_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
 #define CLANG_TEMPLATE_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
 #define CLANG_EXPORT_TEMPLATE
-#elif defined(__MACH__) || defined(__WASM__) || defined(__EMSCRIPTEN__)
+#elif defined(__MACH__) || defined(__WASM__) || defined(__EMSCRIPTEN__) ||     \
+      defined(__wasi__)
 #define CLANG_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
 #define CLANG_TEMPLATE_ABI
 #define CLANG_EXPORT_TEMPLATE
