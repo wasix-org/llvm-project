@@ -1,0 +1,103 @@
+[package]
+name = "wasmer/clang"
+version = "20.1.501-rc.1"
+entrypoint = "clang"
+
+[fs]
+"/lib/clang" = "build-wasix/lib/clang"
+"/sysroot/sysroot" = "wasix-sysroot/wasix-sysroot/sysroot"
+"/sysroot/sysroot-eh" = "wasix-sysroot/wasix-sysroot-eh/sysroot"
+"/sysroot/sysroot-ehpic" = "wasix-sysroot/wasix-sysroot-ehpic/sysroot"
+
+[[module]]
+name = "clang"
+source = "build-wasix/bin/clang-20"
+
+[[module]]
+name = "lld"
+source = "build-wasix/bin/lld"
+
+[[module]]
+name = "llvm-ar"
+source = "build-wasix/bin/llvm-ar"
+
+[[module]]
+name = "llvm-nm"
+source = "build-wasix/bin/llvm-nm"
+
+[[module]]
+name = "llvm-ranlib"
+source = "build-wasix/bin/llvm-ranlib"
+
+[[command]]
+name = "lld"
+module = "lld"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "wasm-ld"
+module = "lld"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "wasm-ld-20"
+module = "lld"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "llvm-ar"
+module = "llvm-ar"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "llvm-ar-20"
+module = "llvm-ar"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "llvm-nm"
+module = "llvm-nm"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "llvm-nm-20"
+module = "llvm-nm"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "llvm-ranlib"
+module = "llvm-ranlib"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "llvm-ranlib-20"
+module = "llvm-ranlib"
+runner = "https://webc.org/runner/wasi"
+
+[[command]]
+name = "clang"
+module = "clang"
+runner = "https://webc.org/runner/wasi"
+[command.annotations.wasi]
+env = ["PATH=/bin"]
+
+[[command]]
+name = "clang-20"
+module = "clang"
+runner = "https://webc.org/runner/wasi"
+[command.annotations.wasi]
+env = ["PATH=/bin"]
+
+[[command]]
+name = "clang++"
+module = "clang"
+runner = "https://webc.org/runner/wasi"
+[command.annotations.wasi]
+env = ["PATH=/bin"]
+
+[[command]]
+name = "clang++-20"
+module = "clang"
+runner = "https://webc.org/runner/wasi"
+[command.annotations.wasi]
+env = ["PATH=/bin"]
