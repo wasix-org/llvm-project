@@ -1173,7 +1173,8 @@ void Writer::createSyntheticInitFunctions() {
     };
     if (llvm::any_of(segments, hasTLSRelocs)) {
       ctx.sym.applyTLSRelocs = symtab->addSyntheticFunction(
-          "__wasm_apply_tls_relocs", WASM_SYMBOL_VISIBILITY_HIDDEN,
+          "__wasm_apply_tls_relocs",
+          WASM_SYMBOL_VISIBILITY_DEFAULT | WASM_SYMBOL_EXPORTED,
           make<SyntheticFunction>(nullSignature, "__wasm_apply_tls_relocs"));
       ctx.sym.applyTLSRelocs->markLive();
     }
@@ -1370,7 +1371,7 @@ void Writer::createInitMemoryFunction() {
             ctx.sym.applyGlobalTLSRelocs) {
           writeU8(os, WASM_OPCODE_CALL, "CALL");
           writeUleb128(os, ctx.sym.applyGlobalTLSRelocs->getFunctionIndex(),
-                      "function index");
+                       "function index");
         }
       }
     }
