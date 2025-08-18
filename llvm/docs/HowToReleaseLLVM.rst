@@ -114,12 +114,12 @@ Branch the Git trunk using the following procedure:
 #. Verify that the current git trunk is in decent shape by
    examining nightly tester and buildbot results.
 
-#. Bump the version in trunk to N.0.0git and tag the commit with llvmorg-N-init.
+#. Bump the version in trunk to N.0.0git and tag the commit with wasixrel-N-init.
    If ``X`` is the version to be released, then ``N`` is ``X + 1``.
 
 ::
 
-  $ git tag -sa llvmorg-N-init
+  $ git tag -sa wasixrel-N-init
 
 #. Clear the release notes in trunk.
 
@@ -146,7 +146,7 @@ Tag release candidates:
 
 ::
 
-  $ git tag -sa llvmorg-X.Y.Z-rcN
+  $ git tag -sa wasixrel-X.Y.Z-rcN
 
 The pre-packaged source tarballs will be automatically generated via the
 "Release Sources" workflow on GitHub.  This workflow will create an artifact
@@ -381,8 +381,8 @@ Tag the final release sources:
 
 ::
 
-  $ git tag -sa llvmorg-X.Y.Z
-  $ git push https://github.com/llvm/llvm-project.git llvmorg-X.Y.Z
+  $ git tag -sa wasixrel-X.Y.Z
+  $ git push https://github.com/llvm/llvm-project.git wasixrel-X.Y.Z
 
 Update the LLVM Website
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -421,7 +421,7 @@ using this command and add it to the post.
 
 ::
 
-  $ git log --format="- %aN: [%s (%h)](https://github.com/llvm/llvm-project/commit/%H)" llvmorg-X.1.N-1..llvmorg-X.1.N
+  $ git log --format="- %aN: [%s (%h)](https://github.com/llvm/llvm-project/commit/%H)" wasixrel-X.1.N-1..wasixrel-X.1.N
 
 Once the release has been announced add a link to the announcement on the llvm
 homepage (from the llvm-www repo) in the "Release Emails" section.

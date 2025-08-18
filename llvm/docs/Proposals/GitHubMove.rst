@@ -967,7 +967,7 @@ releases.
 annotated tags with the given prefix.  Due to limitations with
 ``fast_filter_branch.py``, unannotated tags cannot be renamed
 (``fast_filter_branch.py`` considers them branches, not tags).  Since
-the upstream monorepo had its tags rewritten with an "llvmorg-"
+the upstream monorepo had its tags rewritten with an "wasixrel-"
 prefix, name conflicts should not be an issue.  ``--tag-prefix`` can
 be used to more clearly indicate which tags correspond to various
 imported repositories.

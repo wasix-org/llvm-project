@@ -244,7 +244,7 @@ if [ "$Release" != "test" ]; then
     echo "error: can't specify both -release and -git-ref"
     exit 1
   fi
-  git_ref=llvmorg-$Release
+  git_ref=wasixrel-$Release
   if [ "$RC" != "final" ]; then
     git_ref="$git_ref-$RC"
   fi

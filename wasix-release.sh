@@ -2,6 +2,8 @@
 
 set -euxo pipefail
 
+OUTFILE=${OUTFILE:-LLVM-$(uname -s)-$(uname -p).tar.gz}
+
 # Bit of a weird name, but build* is already gitignored, so we abuse that.
 rm -rf build-release
 mkdir -p build-release
@@ -26,4 +28,4 @@ mkdir -p build-release/lib
 cp -r build/lib/clang build-release/lib/
 
 cd build-release
-tar -czf LLVM-$(uname -s)-$(uname -p).tar.gz bin lib
+tar -czf $OUTFILE bin lib

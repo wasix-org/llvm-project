@@ -1,0 +1,115 @@
+name: Release Task
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      # The regex support here is limited, so just match everything that starts with wasixrel- and filter later.
+      # Note: We're using "wasixrel-*" to differentiate from the "wasix-*" branch names.
+      - "wasixrel-*"
+
+jobs:
+  validate-tag:
+    name: Validate Tag
+    runs-on: ubuntu-24.04
+    if: github.repository == 'wasix-org/llvm-project'
+    outputs:
+      release-version: ${{ steps.validate-tag.outputs.release-version }}
+    steps:
+      - name: Validate Tag
+        id: validate-tag
+        run: |
+          echo "${{ github.ref_name }}" | grep -e '^wasixrel-[0-9]\+\.[0-9]\+\.[0-9]\+\(-rc[0-9]\+\)\?$'
+          release_version=$(echo "${{ github.ref_name }}" | sed 's/wasixrel-//g')
+          echo "release-version=$release_version" >> "$GITHUB_OUTPUT"
+
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu
+            runs-on: depot-ubuntu-22.04-16
+            out-file: LLVM-Linux-x86_64.tar.gz
+          - os: windows
+            runs-on: depot-windows-2022-16
+            out-file: LLVM-Windows-x86_64.tar.gz
+          - os: macos
+            runs-on: depot-macos-15
+            out-file: LLVM-MacOS-aarch64.tar.gz
+
+    name: Build (${{ matrix.os }})
+    needs: validate-tag
+    runs-on: ${{ matrix.runs-on }}
+    if: github.repository == 'wasix-org/llvm-project'
+
+    steps:
+      - name: Set up MinGW (Windows)
+        if: contains(matrix.os, 'windows')
+        uses: e-t-l/setup-mingw@patch-1
+
+      - name: Install ninja (Windows)
+        if: contains(matrix.os, 'windows')
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Setup (Ubuntu)
+        if: contains(matrix.os, 'ubuntu')
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget xz-utils git python3 ninja-build cmake
+
+      - name: Setup (Mac OS)
+        shell: bash
+        if: contains(matrix.os, 'macos')
+        run: |
+          brew update
+          brew install ninja
+
+      - name: Clone Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Build LLVM
+        shell: bash
+        run: |
+          echo "Configuring LLVM for ${{ matrix.os }}"
+          bash ./wasix-configure.sh
+          echo "Building LLVM for ${{ matrix.os }}"
+          export OUTFILE=${{ matrix.out-file }}
+          bash ./wasix-release.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out-file }}
+          path: ./build-release/${{ matrix.out-file }}
+
+  release:
+    name: Create Release
+    needs:
+      - validate-tag
+      - build
+    runs-on: ubuntu-24.04
+    if: github.repository == 'wasix-org/llvm-project'
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Installing gh CLI..."
+          curl -L https://github.com/cli/cli/releases/download/v2.17.0/gh_2.17.0_linux_amd64.tar.gz | tar xvz  --strip-components=2 --exclude=man
+          chmod +x ./gh
+
+          ./gh release create --repo "$GITHUB_REPOSITORY" "${{ needs.validate-tag.outputs.release-version }}" \
+            ./artifacts/LLVM-Windows-x86_64.tar.gz/LLVM-Windows-x86_64.tar.gz \
+            ./artifacts/LLVM-Linux-x86_64.tar.gz/LLVM-Linux-x86_64.tar.gz \
+            ./artifacts/LLVM-MacOS-aarch64.tar.gz/LLVM-MacOS-aarch64.tar.gz

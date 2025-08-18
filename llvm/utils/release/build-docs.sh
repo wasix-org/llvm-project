@@ -85,7 +85,7 @@ fi
 
 # Set default source directory if one is not supplied
 if [ -n "$release" ]; then
-  git_ref=llvmorg-$release
+  git_ref=wasixrel-$release
   if [ -d llvm-project ]; then
     echo "error llvm-project directory already exists"
     exit 1

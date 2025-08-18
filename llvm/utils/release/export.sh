@@ -76,7 +76,7 @@ template_file() {
 }
 
 export_sources() {
-    local tag="llvmorg-$release"
+    local tag="wasixrel-$release"
 
     llvm_src_dir=$(readlink -f $(dirname "$(readlink -f "$0")")/../../..)
     [ -d $llvm_src_dir/.git ] || ( echo "No git repository at $llvm_src_dir" ; exit 1 )
@@ -87,7 +87,7 @@ export_sources() {
         release=$(git -C $llvm_src_dir show $snapshot:cmake/Modules/LLVMVersion.cmake | grep -ioP 'set\(\s*LLVM_VERSION_(MAJOR|MINOR|PATCH)\s\K[0-9]+' | paste -sd '.')
     fi
     
-    tag="llvmorg-$release"
+    tag="wasixrel-$release"
 
     if [ "$rc" = "final" ]; then
         rc=""
