@@ -8,9 +8,7 @@ OUTFILE=${OUTFILE:-LLVM-$(uname -s)-$(uname -p).tar.gz}
 rm -rf build-release
 mkdir -p build-release
 
-cd build
-ninja -j16
-cd ..
+cmake --build build -t bin/lld -t bin/clang -t bin/llvm-ar -t bin/llvm-nm -t bin/llvm-ranlib -j16
 
 mkdir -p build-release/bin
 
