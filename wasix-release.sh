@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-OUTFILE=${OUTFILE:-LLVM-$(uname -s)-$(uname -p).tar.gz}
+OUTFILE=${OUTFILE:-LLVM-$(uname -s)-$(uname -m).tar.gz}
 
 cmake --build build -t bin/lld -t bin/clang -t bin/llvm-ar -t bin/llvm-nm -t bin/llvm-ranlib -j16
 
