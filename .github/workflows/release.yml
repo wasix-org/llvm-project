@@ -47,6 +47,9 @@ jobs:
           - os: macos
             runs-on: depot-macos-15
             out-file: LLVM-MacOS-aarch64.tar.gz
+          - os: macos
+            runs-on: macos-15-intel
+            out-file: LLVM-MacOS-x86_64.tar.gz
 
     name: Build (${{ matrix.os }})
     needs: validate-tag
@@ -150,8 +153,9 @@ jobs:
 
           ./gh release create --draft --repo "$GITHUB_REPOSITORY" "${{ needs.validate-tag.outputs.release-version }}" \
             ./artifacts/LLVM-Windows-x86_64.tar.gz/LLVM-Windows-x86_64.tar.gz \
-            ./artifacts/LLVM-Linux-x86_64.tar.gz/LLVM-Linux-x86_64.tar.gz \
             ./artifacts/LLVM-MacOS-aarch64.tar.gz/LLVM-MacOS-aarch64.tar.gz \
+            ./artifacts/LLVM-MacOS-x86_64.tar.gz/LLVM-MacOS-x86_64.tar.gz \
+            ./artifacts/LLVM-Linux-x86_64.tar.gz/LLVM-Linux-x86_64.tar.gz \
             ./artifacts/LLVM-Linux-aarch64.tar.gz/LLVM-Linux-aarch64.tar.gz \
             ./artifacts/LLVM-Linux-x86_64-musl.tar.gz/LLVM-Linux-x86_64-musl.tar.gz \
             ./artifacts/LLVM-Linux-aarch64-musl.tar.gz/LLVM-Linux-aarch64-musl.tar.gz
