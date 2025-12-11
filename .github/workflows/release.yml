@@ -30,6 +30,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu
+            runs-on: depot-ubuntu-22.04-arm-16
+            out-file: LLVM-Linux-aarch64.tar.gz
+          - os: ubuntu
             runs-on: depot-ubuntu-22.04-16
             out-file: LLVM-Linux-x86_64.tar.gz
           - os: windows
@@ -109,7 +112,8 @@ jobs:
           curl -L https://github.com/cli/cli/releases/download/v2.17.0/gh_2.17.0_linux_amd64.tar.gz | tar xvz  --strip-components=2 --exclude=man
           chmod +x ./gh
 
-          ./gh release create --repo "$GITHUB_REPOSITORY" "${{ needs.validate-tag.outputs.release-version }}" \
+          ./gh release create --draft --repo "$GITHUB_REPOSITORY" "${{ needs.validate-tag.outputs.release-version }}" \
             ./artifacts/LLVM-Windows-x86_64.tar.gz/LLVM-Windows-x86_64.tar.gz \
             ./artifacts/LLVM-Linux-x86_64.tar.gz/LLVM-Linux-x86_64.tar.gz \
-            ./artifacts/LLVM-MacOS-aarch64.tar.gz/LLVM-MacOS-aarch64.tar.gz
+            ./artifacts/LLVM-MacOS-aarch64.tar.gz/LLVM-MacOS-aarch64.tar.gz \
+            ./artifacts/LLVM-Linux-aarch64.tar.gz/LLVM-Linux-aarch64.tar.gz
