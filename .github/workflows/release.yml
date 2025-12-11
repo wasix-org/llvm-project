@@ -35,12 +35,18 @@ jobs:
           - os: alpine
             runs-on: depot-ubuntu-22.04-16
             out-file: LLVM-Linux-x86_64-musl.tar.gz
-          - os: ubuntu
+          - os: static
             runs-on: depot-ubuntu-22.04-arm-16
             out-file: LLVM-Linux-aarch64.tar.gz
-          - os: ubuntu
+          - os: static
             runs-on: depot-ubuntu-22.04-16
             out-file: LLVM-Linux-x86_64.tar.gz
+          - os: ubuntu
+            runs-on: depot-ubuntu-22.04-arm-16
+            out-file: LLVM-Linux-aarch64-gnu.tar.gz
+          - os: ubuntu
+            runs-on: depot-ubuntu-22.04-16
+            out-file: LLVM-Linux-x86_64-gnu.tar.gz
           - os: windows
             runs-on: depot-windows-2022-16
             out-file: LLVM-Windows-x86_64.tar.gz
@@ -86,7 +92,7 @@ jobs:
           brew install ninja
 
       - name: Build LLVM
-        if: "!contains(matrix.os, 'alpine')"
+        if: "!contains(matrix.os, 'alpine') && !contains(matrix.os, 'static')"
         shell: bash
         run: |
           echo "Configuring LLVM for ${{ matrix.os }}"
@@ -119,6 +125,34 @@ jobs:
 
               echo "Configuring LLVM for alpine"
               bash ./wasix-configure.sh
+
+              echo "Building LLVM for alpine (OUTFILE=${OUTFILE})"
+              bash ./wasix-release.sh
+            '
+
+      - name: Build LLVM (Static build in alpine in Docker)
+        if: contains(matrix.os, 'static')
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          # Make OUTFILE available to the container
+          export OUTFILE="${{ matrix.out-file }}"
+
+          docker run --rm \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            -e OUTFILE="$OUTFILE" \
+            alpine:3.20 \
+            sh -lc '
+              set -euxo pipefail
+              apk update
+              apk add \
+                bash curl wget cmake ninja git python3 build-base \
+                zlib-dev zlib-static zstd-dev zstd-static
+
+              echo "Configuring LLVM for static alpine"
+              bash ./wasix-configure.sh static
 
               echo "Building LLVM for alpine (OUTFILE=${OUTFILE})"
               bash ./wasix-release.sh
@@ -158,4 +192,6 @@ jobs:
             ./artifacts/LLVM-Linux-x86_64.tar.gz/LLVM-Linux-x86_64.tar.gz \
             ./artifacts/LLVM-Linux-aarch64.tar.gz/LLVM-Linux-aarch64.tar.gz \
             ./artifacts/LLVM-Linux-x86_64-musl.tar.gz/LLVM-Linux-x86_64-musl.tar.gz \
-            ./artifacts/LLVM-Linux-aarch64-musl.tar.gz/LLVM-Linux-aarch64-musl.tar.gz
+            ./artifacts/LLVM-Linux-aarch64-musl.tar.gz/LLVM-Linux-aarch64-musl.tar.gz \
+            ./artifacts/LLVM-Linux-x86_64-gnu.tar.gz/LLVM-Linux-x86_64-gnu.tar.gz \
+            ./artifacts/LLVM-Linux-aarch64-gnu.tar.gz/LLVM-Linux-aarch64-gnu.tar.gz
