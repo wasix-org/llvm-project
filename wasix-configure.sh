@@ -26,7 +26,7 @@ CMAKE_OPTIONS=(
   -DLLVM_INCLUDE_TESTS="OFF"
 )
 
-if test "$1" = "static"; then
+if test "${1:-x}" = "static"; then
   CMAKE_OPTIONS+=(
     -DBUILD_SHARED_LIBS="OFF"
     -DLLVM_BUILD_LLVM_DYLIB="OFF"
