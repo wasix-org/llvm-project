@@ -29,6 +29,12 @@ jobs:
     strategy:
       matrix:
         include:
+          - os: alpine
+            runs-on: depot-ubuntu-22.04-arm-16
+            out-file: LLVM-Linux-aarch64-musl.tar.gz
+          - os: alpine
+            runs-on: depot-ubuntu-22.04-16
+            out-file: LLVM-Linux-x86_64-musl.tar.gz
           - os: ubuntu
             runs-on: depot-ubuntu-22.04-arm-16
             out-file: LLVM-Linux-aarch64.tar.gz
@@ -56,6 +62,12 @@ jobs:
         if: contains(matrix.os, 'windows')
         uses: seanmiddleditch/gha-setup-ninja@master
 
+      - name: Clone Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
       - name: Setup (Ubuntu)
         if: contains(matrix.os, 'ubuntu')
         shell: bash
@@ -70,13 +82,8 @@ jobs:
           brew update
           brew install ninja
 
-      - name: Clone Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
       - name: Build LLVM
+        if: "!contains(matrix.os, 'alpine')"
         shell: bash
         run: |
           echo "Configuring LLVM for ${{ matrix.os }}"
@@ -84,6 +91,35 @@ jobs:
           echo "Building LLVM for ${{ matrix.os }}"
           export OUTFILE=${{ matrix.out-file }}
           bash ./wasix-release.sh
+      
+      # Alpine build runs inside a Docker container
+      - name: Build LLVM (musl build in alpine in Docker)
+        if: contains(matrix.os, 'alpine')
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          # Make OUTFILE available to the container
+          export OUTFILE="${{ matrix.out-file }}"
+
+          docker run --rm \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            -e OUTFILE="$OUTFILE" \
+            alpine:3.20 \
+            sh -lc '
+              set -euxo pipefail
+              apk update
+              apk add \
+                bash curl wget cmake ninja git python3 build-base \
+                zlib-dev zlib-static zstd-dev zstd-static
+
+              echo "Configuring LLVM for alpine"
+              bash ./wasix-configure.sh
+
+              echo "Building LLVM for alpine (OUTFILE=${OUTFILE})"
+              bash ./wasix-release.sh
+            '
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -116,4 +152,6 @@ jobs:
             ./artifacts/LLVM-Windows-x86_64.tar.gz/LLVM-Windows-x86_64.tar.gz \
             ./artifacts/LLVM-Linux-x86_64.tar.gz/LLVM-Linux-x86_64.tar.gz \
             ./artifacts/LLVM-MacOS-aarch64.tar.gz/LLVM-MacOS-aarch64.tar.gz \
-            ./artifacts/LLVM-Linux-aarch64.tar.gz/LLVM-Linux-aarch64.tar.gz
+            ./artifacts/LLVM-Linux-aarch64.tar.gz/LLVM-Linux-aarch64.tar.gz \
+            ./artifacts/LLVM-Linux-x86_64-musl.tar.gz/LLVM-Linux-x86_64-musl.tar.gz \
+            ./artifacts/LLVM-Linux-aarch64-musl.tar.gz/LLVM-Linux-aarch64-musl.tar.gz
