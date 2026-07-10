@@ -2013,10 +2013,11 @@ WebAssemblyTargetLowering::LowerGlobalTLSAddress(SDValue Op,
 
   const GlobalValue *GV = GA->getGlobal();
 
-  // Currently only Emscripten supports dynamic linking with threads. Therefore,
-  // on other targets, if we have thread-local storage, only the local-exec
-  // model is possible.
-  auto model = Subtarget->getTargetTriple().isOSEmscripten()
+  // Currently only Emscripten and WASIX support dynamic linking with threads.
+  // Therefore, on other targets, if we have thread-local storage, only the
+  // local-exec model is possible.
+  const llvm::Triple &TargetTriple = Subtarget->getTargetTriple();
+  auto model = TargetTriple.isOSEmscripten() || TargetTriple.isOSWASIX()
                    ? GV->getThreadLocalMode()
                    : GlobalValue::LocalExecTLSModel;
 
