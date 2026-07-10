@@ -254,6 +254,12 @@ aliasname:                                                                     \
 #define NO_EXEC_STACK_DIRECTIVE
 
 // clang-format on
+#elif defined(__wasm__)
+
+// WebAssembly builds compile no assembly sources, but this header is still
+// included; it only needs to define the directives referenced unconditionally.
+#define NO_EXEC_STACK_DIRECTIVE
+
 #else
 
 #error Unsupported target
