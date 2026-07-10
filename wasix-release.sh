@@ -24,6 +24,15 @@ mkdir -p build-release/lib
 cp -r build/bin build-release
 cp -r build/lib/clang build-release/lib
 
+# Default sysroot for direct `clang --target=wasm32-wasixv2` invocations.
+# Clang auto-loads <normalized-triple>.cfg from the directory of the clang
+# binary; the toolchain is installed at <root>/llvm with sysroots at
+# <root>/sysroot (wasixcc layout), and the canonical WASIX v2 sysroot is the
+# exnref-EH flavor. An explicit --sysroot on the command line overrides this.
+cat > build-release/bin/wasm32-unknown-wasixv2.cfg <<'CFG'
+--sysroot=<CFGDIR>/../../sysroot/sysroot-exnref-eh
+CFG
+
 # Remove unneccessary files
 rm -rf build-release/bin/*tblgen*
 rm -rf build-release/bin/llvm-lit*
