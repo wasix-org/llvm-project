@@ -552,7 +552,8 @@ SanitizerMask WebAssembly::getSupportedSanitizers() const {
     Res |= SanitizerKind::Vptr | SanitizerKind::Leak;
   }
 
-  if (getTriple().isOSEmscripten() || getTriple().isOSWASI()) {
+  if (getTriple().isOSEmscripten() || getTriple().isOSWASI() ||
+      getTriple().isOSWASIX()) {
     Res |= SanitizerKind::Address;
   }
 

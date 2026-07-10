@@ -341,6 +341,8 @@ StringRef Triple::getOSTypeName(OSType Kind) {
   case Vulkan: return "vulkan";
   case CheriotRTOS:
     return "cheriotrtos";
+  case WASIX:
+    return "wasix";
   }
 
   llvm_unreachable("Invalid OSType");
@@ -747,6 +749,10 @@ static Triple::OSType parseOS(StringRef OSName) {
       .StartsWith("wasip1", Triple::WASIp1)
       .StartsWith("wasip2", Triple::WASIp2)
       .StartsWith("wasip3", Triple::WASIp3)
+      // Covers both WASIX v1 ("wasix") and v2 ("wasixv2"); the two are
+      // distinguished by getOSName(). Must precede the "wasi" prefix match
+      // below, which would otherwise swallow both.
+      .StartsWith("wasix", Triple::WASIX)
       .StartsWith("wasi", Triple::WASI)
       .StartsWith("emscripten", Triple::Emscripten)
       .StartsWith("shadermodel", Triple::ShaderModel)

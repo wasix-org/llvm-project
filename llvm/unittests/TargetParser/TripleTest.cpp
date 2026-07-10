@@ -632,6 +632,25 @@ TEST(TripleTest, ParsedIDs) {
   EXPECT_EQ(Triple::WASIp3, T.getOS());
   EXPECT_EQ(Triple::UnknownEnvironment, T.getEnvironment());
 
+  // WASIX v1 and v2 share Triple::WASIX and are distinguished by OS name.
+  T = Triple("wasm32-unknown-wasix");
+  EXPECT_EQ(Triple::wasm32, T.getArch());
+  EXPECT_EQ(Triple::UnknownVendor, T.getVendor());
+  EXPECT_EQ(Triple::WASIX, T.getOS());
+  EXPECT_EQ("wasix", T.getOSName());
+  EXPECT_FALSE(T.isOSWASI());
+  EXPECT_TRUE(T.isOSWASIX());
+  EXPECT_EQ(Triple::UnknownEnvironment, T.getEnvironment());
+
+  T = Triple("wasm32-unknown-wasixv2");
+  EXPECT_EQ(Triple::wasm32, T.getArch());
+  EXPECT_EQ(Triple::UnknownVendor, T.getVendor());
+  EXPECT_EQ(Triple::WASIX, T.getOS());
+  EXPECT_EQ("wasixv2", T.getOSName());
+  EXPECT_FALSE(T.isOSWASI());
+  EXPECT_TRUE(T.isOSWASIX());
+  EXPECT_EQ(Triple::UnknownEnvironment, T.getEnvironment());
+
   T = Triple("wasm64-unknown-unknown");
   EXPECT_EQ(Triple::wasm64, T.getArch());
   EXPECT_EQ(Triple::UnknownVendor, T.getVendor());
@@ -1743,6 +1762,10 @@ TEST(TripleTest, Normalization) {
             Triple::normalize("wasm32-wasi")); // wasm32-unknown-wasi
   EXPECT_EQ("wasm64-unknown-wasi",
             Triple::normalize("wasm64-wasi")); // wasm64-unknown-wasi
+  EXPECT_EQ("wasm32-unknown-wasix",
+            Triple::normalize("wasm32-wasix")); // wasm32-unknown-wasix
+  EXPECT_EQ("wasm32-unknown-wasixv2",
+            Triple::normalize("wasm32-wasixv2")); // wasm32-unknown-wasixv2
 }
 
 TEST(TripleTest, MutateName) {

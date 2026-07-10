@@ -712,6 +712,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
     case llvm::Triple::WASIp3:
       return std::make_unique<WASIP3TargetInfo<WebAssembly32TargetInfo>>(Triple,
                                                                          Opts);
+    case llvm::Triple::WASIX:
+      return std::make_unique<WASIXTargetInfo<WebAssembly32TargetInfo>>(Triple,
+                                                                        Opts);
     case llvm::Triple::Emscripten:
       return std::make_unique<EmscriptenTargetInfo<WebAssembly32TargetInfo>>(
           Triple, Opts);
@@ -741,6 +744,9 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
     case llvm::Triple::WASIp3:
       return std::make_unique<WASIP3TargetInfo<WebAssembly64TargetInfo>>(Triple,
                                                                          Opts);
+    case llvm::Triple::WASIX:
+      return std::make_unique<WASIXTargetInfo<WebAssembly64TargetInfo>>(Triple,
+                                                                        Opts);
     case llvm::Triple::Emscripten:
       return std::make_unique<EmscriptenTargetInfo<WebAssembly64TargetInfo>>(
           Triple, Opts);

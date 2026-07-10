@@ -985,6 +985,32 @@ public:
   using WebAssemblyOSTargetInfo<Target>::WebAssemblyOSTargetInfo;
 };
 
+// WASIX target (v1 and v2, distinguished by triple OS name)
+template <typename Target>
+class LLVM_LIBRARY_VISIBILITY WASIXTargetInfo
+    : public WebAssemblyOSTargetInfo<Target> {
+  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
+                    MacroBuilder &Builder) const final {
+    WebAssemblyOSTargetInfo<Target>::getOSDefines(Opts, Triple, Builder);
+    // Common to both versions; code that works on either WASIX gates on this.
+    Builder.defineMacro("__wasix__");
+    if (Triple.getOSName() == "wasixv2") {
+      Builder.defineMacro("__wasixv2__");
+      // WASIX v2 is a POSIX-oriented platform.
+      DefineStd(Builder, "unix", Opts);
+    } else {
+      // WASIX v1 is derived from wasi-libc/WASIp1, so code targeting it may
+      // legitimately gate on __wasi__. v2 deliberately does NOT define
+      // __wasi__: its syscall surface is not WASI-compatible.
+      Builder.defineMacro("__wasi__");
+      Builder.defineMacro("__wasixv1__");
+    }
+  }
+
+public:
+  using WebAssemblyOSTargetInfo<Target>::WebAssemblyOSTargetInfo;
+};
+
 // WALI target
 template <typename Target>
 class LLVM_LIBRARY_VISIBILITY WALITargetInfo

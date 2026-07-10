@@ -252,7 +252,8 @@ public:
     Serenity,
     Vulkan, // Vulkan SPIR-V
     CheriotRTOS,
-    LastOSType = CheriotRTOS
+    WASIX, // WASIX (Wasmer); v1 as "wasix", v2 as "wasixv2"
+    LastOSType = WASIX
   };
   enum EnvironmentType {
     UnknownEnvironment,
@@ -764,6 +765,11 @@ public:
     return getOS() == Triple::WASI || getOS() == Triple::WASIp1 ||
            getOS() == Triple::WASIp2 || getOS() == Triple::WASIp3;
   }
+
+  /// Tests whether the OS is WASIX. This covers both WASIX v1 (OS name
+  /// "wasix") and WASIX v2 (OS name "wasixv2"); use getOSName() to
+  /// distinguish the two.
+  bool isOSWASIX() const { return getOS() == Triple::WASIX; }
 
   /// Tests whether the OS is Emscripten.
   bool isOSEmscripten() const {

@@ -1674,6 +1674,18 @@
 // RUN: %clang_cc1 -E -dM -ffreestanding -fgnuc-version=4.2.1 -triple=wasm64-wasip3 \
 // RUN:   < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=WEBASSEMBLY,WEBASSEMBLY64,WASI,WASIP3 %s
+// RUN: %clang_cc1 -E -dM -ffreestanding -fgnuc-version=4.2.1 -triple=wasm32-wasix \
+// RUN:   < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=WEBASSEMBLY,WEBASSEMBLY32,WASIX,WASIXV1 %s
+// RUN: %clang_cc1 -E -dM -ffreestanding -fgnuc-version=4.2.1 -triple=wasm64-wasix \
+// RUN:   < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=WEBASSEMBLY,WEBASSEMBLY64,WASIX,WASIXV1 %s
+// RUN: %clang_cc1 -E -dM -ffreestanding -fgnuc-version=4.2.1 -triple=wasm32-wasixv2 \
+// RUN:   < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=WEBASSEMBLY,WEBASSEMBLY32,WASIX,WASIXV2 %s
+// RUN: %clang_cc1 -E -dM -ffreestanding -fgnuc-version=4.2.1 -triple=wasm64-wasixv2 \
+// RUN:   < /dev/null \
+// RUN:   | FileCheck -match-full-lines -check-prefixes=WEBASSEMBLY,WEBASSEMBLY64,WASIX,WASIXV2 %s
 // RUN: %clang_cc1 -E -dM -ffreestanding -fgnuc-version=4.2.1 -triple=wasm32-unknown-unknown -x c++ \
 // RUN:   < /dev/null \
 // RUN:   | FileCheck -match-full-lines -check-prefixes=WEBASSEMBLY-CXX %s
@@ -2093,12 +2105,21 @@
 // WEBASSEMBLY-NEXT:#define __llvm__ 1
 // WASI-NOT:#define __unix
 // WASI-NOT:#define __unix__
+// WASIXV1-NOT:#define __unix
+// WASIXV1-NOT:#define __unix__
 // EMSCRIPTEN-NEXT:#define __unix 1
 // EMSCRIPTEN-NEXT:#define __unix__ 1
+// WASIXV2-NEXT:#define __unix 1
+// WASIXV2-NEXT:#define __unix__ 1
 // WASI-NEXT:#define __wasi__ 1
+// WASIXV2-NOT:#define __wasi__
+// WASIXV1-NEXT:#define __wasi__ 1
 // WASIP1-NEXT:#define __wasip1__ 1
 // WASIP2-NEXT:#define __wasip2__ 1
 // WASIP3-NEXT:#define __wasip3__ 1
+// WASIX-NEXT:#define __wasix__ 1
+// WASIXV1-NEXT:#define __wasixv1__ 1
+// WASIXV2-NEXT:#define __wasixv2__ 1
 // WEBASSEMBLY-NOT:#define __wasm_simd128__
 // WEBASSEMBLY-NOT:#define __wasm_simd256__
 // WEBASSEMBLY-NOT:#define __wasm_simd512__
@@ -2114,6 +2135,8 @@
 // WEBASSEMBLY-NEXT:#define __wasm__ 1
 // EMSCRIPTEN:#define unix 1
 // WASI-NOT:#define unix 1
+// WASIXV2:#define unix 1
+// WASIXV1-NOT:#define unix 1
 // WEBASSEMBLY-CXX-NOT:_REENTRANT
 // WEBASSEMBLY-CXX-NOT:__STDCPP_THREADS__
 // WEBASSEMBLY-CXX-ATOMICS:#define _REENTRANT 1
