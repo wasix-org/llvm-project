@@ -29,8 +29,8 @@
 // No _LIBCPP_ELAST needed on NuttX
 #elif defined(__Fuchsia__)
 // No _LIBCPP_ELAST needed on Fuchsia
-#elif defined(__wasi__)
-// No _LIBCPP_ELAST needed on WASI
+#elif defined(__wasi__) || defined(__wasix__)
+// No _LIBCPP_ELAST needed on WASI/WASIX
 #elif defined(__EMSCRIPTEN__)
 // No _LIBCPP_ELAST needed on Emscripten
 #elif defined(__linux__) || _LIBCPP_HAS_MUSL_LIBC
