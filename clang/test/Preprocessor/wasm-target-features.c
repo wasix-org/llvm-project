@@ -239,3 +239,39 @@
 // RUN:   | FileCheck %s -check-prefix=WIDE-ARITHMETIC
 //
 // WIDE-ARITHMETIC: #define __wasm_wide_arithmetic__ 1{{$}}
+
+// WASIX v2 defaults to the full platform feature set (generic + atomics,
+// simd128, relaxed-simd, extended-const), overridable with -mno-* flags.
+// The wasm EH default additionally enables exception-handling. WASIX v1
+// ("wasix") keeps the stock generic defaults.
+// RUN: %clang -E -dM %s -o - 2>&1 \
+// RUN:     -target wasm32-wasixv2 \
+// RUN:   | FileCheck %s -check-prefix=WASIXV2-DEFAULT
+// RUN: %clang -E -dM %s -o - 2>&1 \
+// RUN:     -target wasm64-wasixv2 \
+// RUN:   | FileCheck %s -check-prefix=WASIXV2-DEFAULT
+//
+// WASIXV2-DEFAULT-DAG: #define __wasm_atomics__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_bulk_memory__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_exception_handling__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_extended_const__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_multivalue__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_mutable_globals__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_reference_types__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_relaxed_simd__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_sign_ext__ 1{{$}}
+// WASIXV2-DEFAULT-DAG: #define __wasm_simd128__ 1{{$}}
+
+// RUN: %clang -E -dM %s -o - 2>&1 \
+// RUN:     -target wasm32-wasixv2 -mno-simd128 \
+// RUN:   | FileCheck %s -check-prefix=WASIXV2-NO-SIMD128
+//
+// WASIXV2-NO-SIMD128-NOT: #define __wasm_simd128__ 1{{$}}
+
+// RUN: %clang -E -dM %s -o - 2>&1 \
+// RUN:     -target wasm32-wasix \
+// RUN:   | FileCheck %s -check-prefix=WASIXV1-DEFAULT
+//
+// WASIXV1-DEFAULT-NOT: #define __wasm_atomics__ 1{{$}}
+// WASIXV1-DEFAULT-NOT: #define __wasm_simd128__ 1{{$}}
+// WASIXV1-DEFAULT-NOT: #define __wasm_exception_handling__ 1{{$}}

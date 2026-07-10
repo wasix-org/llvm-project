@@ -208,6 +208,19 @@ bool WebAssemblyTargetInfo::initFeatureMap(
     addBleedingEdgeFeatures();
   }
 
+  // WASIX v2 is an always-threaded platform whose runtimes (Wasmer) support
+  // the full feature set below; make it the default so plain
+  // `clang --target=wasm32-wasixv2` output matches the platform contract.
+  // These are defaults, not requirements: explicit -mno-* flags arrive via
+  // FeaturesVec and override them. WASIX v1 ("wasix") is deliberately not
+  // included; it keeps the stock defaults of its wasm32-wasi origins.
+  if (getTriple().isOSWASIX() && getTriple().getOSName() == "wasixv2") {
+    addGenericFeatures();
+    Features["atomics"] = true;
+    Features["extended-const"] = true;
+    setSIMDLevel(Features, RelaxedSIMD, true);
+  }
+
   return TargetInfo::initFeatureMap(Features, Diags, CPU, FeaturesVec);
 }
 
