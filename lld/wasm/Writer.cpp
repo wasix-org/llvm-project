@@ -1181,8 +1181,12 @@ void Writer::createSyntheticInitFunctions() {
       return false;
     };
     if (llvm::any_of(segments, hasTLSRelocs)) {
+      // Mark this function as exported so that a dynamic linker that
+      // re-instantiates the module (e.g. for a new thread) can invoke it to
+      // re-apply TLS relocations for the fresh TLS area.
       ctx.sym.applyTLSRelocs = symtab->addSyntheticFunction(
-          "__wasm_apply_tls_relocs", WASM_SYMBOL_VISIBILITY_HIDDEN,
+          "__wasm_apply_tls_relocs",
+          WASM_SYMBOL_VISIBILITY_DEFAULT | WASM_SYMBOL_EXPORTED,
           make<SyntheticFunction>(nullSignature, "__wasm_apply_tls_relocs"));
       ctx.sym.applyTLSRelocs->markLive();
     }
@@ -1372,6 +1376,17 @@ void Writer::createInitMemoryFunction() {
           writeUleb128(os, s->index, "segment index immediate");
           writeU8(os, 0, "memory index immediate");
         }
+
+        // After initializing the TLS segment, we also need to apply TLS
+        // relocations to it, in the same way __wasm_init_tls does for
+        // dynamically-created TLS areas. __tls_base was set above, which is
+        // all __wasm_apply_global_tls_relocs depends on. (applyGlobalTLSRelocs
+        // is only ever created when linking with shared memory.)
+        if (s->isTLS() && ctx.sym.applyGlobalTLSRelocs) {
+          writeU8(os, WASM_OPCODE_CALL, "CALL");
+          writeUleb128(os, ctx.sym.applyGlobalTLSRelocs->getFunctionIndex(),
+                       "function index");
+        }
       }
     }
 
@@ -1524,8 +1539,8 @@ void Writer::createApplyGlobalRelocationsFunction() {
 }
 
 // Similar to createApplyGlobalRelocationsFunction but for
-// TLS symbols.  This cannot be run during the start function
-// but must be delayed until __wasm_init_tls is called.
+// TLS symbols. Can only be called after __tls_base has been
+// initialized (e.g. from __wasm_init_tls or __wasm_init_memory).
 void Writer::createApplyGlobalTLSRelocationsFunction() {
   // First write the body's contents to a string.
   std::string bodyContent;
