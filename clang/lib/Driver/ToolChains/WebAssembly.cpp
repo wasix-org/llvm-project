@@ -67,7 +67,56 @@ static bool TargetBuildsComponents(const llvm::Triple &TargetTriple) {
          TargetTriple.getOSName() != "wasi";
 }
 
+// WASIX v2 ("wasixv2") gets the WASIX platform contract baked into the
+// driver as defaults. The original WASIX ("wasix") shares the WASIX OS type
+// but is only a rename of its wasm32-wasi-based setup: it must not receive
+// any behavior changes, and its toolchain (wasixcc) passes everything
+// explicitly.
+static bool TargetIsWASIXv2(const llvm::Triple &TargetTriple) {
+  return TargetTriple.isOSWASIX() && TargetTriple.getOSName() == "wasixv2";
+}
+
+// Whether WASIX v2's exceptions-on-by-default (wasm EH, exnref style, with
+// wasm SjLj) applies. This is only a default: any explicit user choice about
+// exceptions or the EH-related features disables it instead of erroring.
+static bool WantsWASIXv2EHDefault(const llvm::Triple &TargetTriple,
+                                  const llvm::opt::ArgList &Args) {
+  if (!TargetIsWASIXv2(TargetTriple))
+    return false;
+  // An explicit personality choice takes over completely.
+  if (Args.hasArg(options::OPT_fwasm_exceptions, options::OPT_fsjlj_exceptions,
+                  options::OPT_fseh_exceptions, options::OPT_fdwarf_exceptions))
+    return false;
+  // -fno-exceptions opts out of the platform EH contract (e.g. to use
+  // asyncify-based unwinding instead).
+  if (Args.hasFlag(options::OPT_fno_exceptions, options::OPT_fexceptions,
+                   false))
+    return false;
+  // Explicitly disabling features wasm EH requires wins over the default.
+  if (Args.hasFlag(options::OPT_mno_exception_handing,
+                   options::OPT_mexception_handing, false) ||
+      Args.hasFlag(options::OPT_mno_multivalue, options::OPT_mmultivalue,
+                   false) ||
+      Args.hasFlag(options::OPT_mno_reference_types,
+                   options::OPT_mreference_types, false))
+    return false;
+  // Manual control via -mllvm EH options disables the default too.
+  for (const Arg *A : Args.filtered(options::OPT_mllvm))
+    for (const char *Option :
+         {"-wasm-enable-eh", "-wasm-enable-sjlj", "-wasm-use-legacy-eh",
+          "-enable-emscripten-cxx-exceptions", "-enable-emscripten-sjlj"})
+      if (StringRef(A->getValue(0)).starts_with(Option))
+        return false;
+  return true;
+}
+
 static bool WantsPthread(const llvm::Triple &Triple, const ArgList &Args) {
+  // WASIX v2 is an always-threaded platform: the runtime and libc do not
+  // support single-threaded modules. -no-pthread is rejected in
+  // addClangTargetOptions.
+  if (TargetIsWASIXv2(Triple))
+    return true;
+
   bool WantsPthread =
       Args.hasFlag(options::OPT_pthread, options::OPT_no_pthread, false);
 
@@ -97,6 +146,42 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (Args.hasArg(options::OPT_s))
     CmdArgs.push_back("--strip-all");
+
+  if (TargetIsWASIXv2(ToolChain.getTriple())) {
+    // WASIX v2 platform defaults. These are emitted before any user-provided
+    // linker flags so that explicit flags win: wasm-ld honors the last
+    // occurrence of -z stack-size and --max-memory.
+    //
+    // Memory must be imported because WASIX is always threaded, and
+    // non-imported shared memory does not work.
+    CmdArgs.push_back("--import-memory");
+    CmdArgs.push_back("-z");
+    CmdArgs.push_back("stack-size=1048576");
+    CmdArgs.push_back("--max-memory=4294967296");
+
+    // Symbols the Wasmer host looks up in WASIX modules. Only symbols the
+    // linker itself synthesizes belong here; wasix-libc exports the symbols
+    // it defines (wasi_thread_start, __wasm_signal, __wasix_init_tls) via
+    // export_name attributes. __wasm_init_tls, __tls_size and __tls_align
+    // are not read by current hosts and are kept for compatibility with
+    // older ones.
+    for (const char *Sym :
+         {"__wasm_call_ctors", "__tls_base", "__stack_low", "__stack_high",
+          "__stack_pointer", "__data_end", "__indirect_function_table",
+          "__wasm_init_tls", "__tls_size", "__tls_align"})
+      CmdArgs.push_back(
+          Args.MakeArgString(std::string("--export-if-defined=") + Sym));
+
+    // Keep LTO code generation consistent with the compile-side wasm EH
+    // defaults.
+    if (WantsWASIXv2EHDefault(ToolChain.getTriple(), Args)) {
+      for (const char *Flag :
+           {"-wasm-enable-eh", "-wasm-enable-sjlj", "-wasm-use-legacy-eh=false"}) {
+        CmdArgs.push_back("-mllvm");
+        CmdArgs.push_back(Flag);
+      }
+    }
+  }
 
   // On `wasip2` the default linker is `wasm-component-ld` which wraps the
   // execution of `wasm-ld`. Find `wasm-ld` and pass it as an argument of where
@@ -180,9 +265,12 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   CmdArgs.push_back(Output.getFilename());
 
   // Don't use wasm-opt by default on `wasip2` as it doesn't have support for
-  // components at this time. Retain the historical default otherwise, though,
-  // of running `wasm-opt` by default.
-  bool WasmOptDefault = !TargetBuildsComponents(ToolChain.getTriple());
+  // components at this time. Don't use it on WASIX v2 either: this invocation
+  // passes none of the --enable-* feature flags WASIX modules need, so
+  // wasm-opt orchestration belongs to wasixcc. Retain the historical default
+  // otherwise, though, of running `wasm-opt` by default.
+  bool WasmOptDefault = !TargetBuildsComponents(ToolChain.getTriple()) &&
+                        !TargetIsWASIXv2(ToolChain.getTriple());
   bool RunWasmOpt = Args.hasFlag(options::OPT_wasm_opt,
                                  options::OPT_no_wasm_opt, WasmOptDefault);
 
@@ -307,6 +395,33 @@ void WebAssembly::addClangTargetOptions(const ArgList &DriverArgs,
                           options::OPT_fno_use_init_array, true))
     CC1Args.push_back("-fno-use-init-array");
 
+  if (TargetIsWASIXv2(getTriple())) {
+    // Threads cannot be disabled on WASIX v2.
+    if (DriverArgs.hasFlag(options::OPT_no_pthread, options::OPT_pthread,
+                           false))
+      getDriver().Diag(diag::err_drv_unsupported_opt_for_target)
+          << "-no-pthread" << getTriple().str();
+
+    // Always-threaded also at the language level (POSIXThreads/_REENTRANT),
+    // not just in target features and linker flags. The generic driver only
+    // forwards -pthread when the user passed it.
+    if (!DriverArgs.hasArg(options::OPT_pthread, options::OPT_no_pthread))
+      CC1Args.push_back("-pthread");
+
+    // Non-PIC modules default to the local-exec TLS model; under -fPIC,
+    // clang's regular global-dynamic default applies (the WASIX dynamic
+    // linker relies on it). An explicit -ftls-model= always wins.
+    if (!DriverArgs.hasArg(options::OPT_ftlsmodel_EQ)) {
+      llvm::Reloc::Model RelocationModel;
+      unsigned PICLevel;
+      bool IsPIE;
+      std::tie(RelocationModel, PICLevel, IsPIE) =
+          ParsePICArgs(*this, DriverArgs);
+      if (RelocationModel != llvm::Reloc::PIC_)
+        CC1Args.push_back("-ftls-model=local-exec");
+    }
+  }
+
   // '-pthread' implies atomics, bulk-memory, mutable-globals, and sign-ext
   if (WantsPthread(getTriple(), DriverArgs)) {
     if (DriverArgs.hasFlag(options::OPT_mno_atomics, options::OPT_matomics,
@@ -416,6 +531,18 @@ void WebAssembly::addClangTargetOptions(const ArgList &DriverArgs,
     // Backend needs -wasm-enable-eh to enable Wasm EH
     CC1Args.push_back("-mllvm");
     CC1Args.push_back("-wasm-enable-eh");
+  } else if (WantsWASIXv2EHDefault(getTriple(), DriverArgs)) {
+    // WASIX v2 defaults to wasm exceptions (exnref style) with wasm SjLj;
+    // the canonical sysroot is built with them. WantsWASIXv2EHDefault is
+    // false whenever the user makes any explicit exceptions choice, so no
+    // BanIncompatibleOptions-style errors apply here.
+    EnableFeaturesForWasmEHSjLj();
+    CC1Args.push_back("-mllvm");
+    CC1Args.push_back("-wasm-enable-eh");
+    CC1Args.push_back("-mllvm");
+    CC1Args.push_back("-wasm-enable-sjlj");
+    CC1Args.push_back("-mllvm");
+    CC1Args.push_back("-wasm-use-legacy-eh=false");
   }
 
   for (const Arg *A : DriverArgs.filtered(options::OPT_mllvm)) {
