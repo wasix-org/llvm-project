@@ -66,6 +66,21 @@ jobs:
       - name: Set up MinGW (Windows)
         if: contains(matrix.os, 'windows')
         uses: e-t-l/setup-mingw@patch-1
+        with:
+          version: 16.1.0
+          cc: '0'
+          static: '0'
+
+      - name: Select MinGW 16.1 (Windows)
+        if: contains(matrix.os, 'windows')
+        shell: pwsh
+        run: |
+          $mingwBin = Join-Path $env:ProgramData 'mingw64\mingw64\bin'
+          $portableBin = $mingwBin.Replace('\', '/')
+          $mingwBin >> $env:GITHUB_PATH
+          "CC=$portableBin/x86_64-w64-mingw32-gcc.exe" >> $env:GITHUB_ENV
+          "CXX=$portableBin/x86_64-w64-mingw32-g++.exe" >> $env:GITHUB_ENV
+          "MINGW_BIN=$portableBin" >> $env:GITHUB_ENV
 
       - name: Install ninja (Windows)
         if: contains(matrix.os, 'windows')

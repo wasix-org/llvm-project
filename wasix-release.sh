@@ -30,7 +30,15 @@ rm -rf build-release/bin/llvm-lit*
 # Strip binaries
 strip build-release/bin/*
 
+if test "$OS" = "windows"; then
+  : "${MINGW_BIN:?MINGW_BIN must point to the selected MinGW bin directory}"
+  for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll; do
+    test -f "$MINGW_BIN/$dll"
+    cp "$MINGW_BIN/$dll" build-release/bin
+  done
+fi
+
 ls build-release/bin
 
 cd build-release
-tar -czf $OUTFILE bin lib
+tar -czf "$OUTFILE" bin lib
