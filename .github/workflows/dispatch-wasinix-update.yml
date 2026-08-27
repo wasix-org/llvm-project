@@ -1,0 +1,22 @@
+name: Dispatch Wasinix Update
+
+# A published wasix-org LLVM release means the wasinix pin can bump now
+# instead of waiting for wasinix's weekly update schedule.
+#
+# Requires the WASINIX_DISPATCH_TOKEN secret: a token with actions write
+# access on wasix-org/wasinix. The default GITHUB_TOKEN cannot dispatch
+# workflows in another repository.
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the wasinix update workflow
+        env:
+          GH_TOKEN: ${{ secrets.WASINIX_DISPATCH_TOKEN }}
+        run: gh workflow run update.yml --repo wasix-org/wasinix -f targets=llvm
