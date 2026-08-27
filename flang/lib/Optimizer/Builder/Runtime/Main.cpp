@@ -14,6 +14,7 @@
 #include "flang/Optimizer/Builder/Runtime/RTBuilder.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
+#include "flang/Optimizer/Dialect/Support/FIRContext.h"
 #include "flang/Runtime/CUDA/init.h"
 #include "flang/Runtime/main.h"
 #include "flang/Runtime/stop.h"
@@ -39,10 +40,14 @@ void fir::runtime::genMain(
       builder.createFunction(loc, RTNAME_STRING(ProgramEndStatement),
                              mlir::FunctionType::get(context, {}, {}));
 
-  // int main(int argc, char** argv, char** envp)
+  const llvm::Triple &target = fir::getTargetTriple(builder.getModule());
+  const bool isWasi = target.isWasm() && target.getOS() == llvm::Triple::WASI;
+  llvm::StringRef mainName = isWasi ? "__main_argc_argv" : "main";
+  llvm::SmallVector<mlir::Type> mainArgTys{argcTy, ptrTy};
+  if (!isWasi)
+    mainArgTys.push_back(ptrTy);
   auto mainFn = builder.createFunction(
-      loc, "main",
-      mlir::FunctionType::get(context, {argcTy, ptrTy, ptrTy}, argcTy));
+      loc, mainName, mlir::FunctionType::get(context, mainArgTys, argcTy));
   // void _QQmain()
   auto qqMainFn = builder.createFunction(
       loc, "_QQmain", mlir::FunctionType::get(context, {}, {}));
@@ -60,6 +65,8 @@ void fir::runtime::genMain(
   auto env = fir::runtime::genEnvironmentDefaults(builder, loc, defs);
 
   llvm::SmallVector<mlir::Value, 4> args(block->getArguments());
+  if (isWasi)
+    args.push_back(builder.create<fir::ZeroOp>(loc, ptrTy));
   args.push_back(env);
 
   builder.create<fir::CallOp>(loc, startFn, args);
