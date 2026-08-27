@@ -17,9 +17,9 @@
 #include <future>
 #include <limits>
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include "flang/Common/windows-include.h"
-#else
+#elif !defined(__wasi__)
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -249,6 +249,15 @@ void RTNAME(ExecuteCommandLine)(const Descriptor &command, bool wait,
       }
     }
     FreeMemory(wcmd);
+#elif defined(__wasi__)
+    if (!cmdstat) {
+      terminator.Crash(
+          "Asynchronous command execution is not supported on this platform.");
+    } else {
+      StoreIntToDescriptor(cmdstat, ASYNC_NO_SUPPORT_ERR, terminator);
+      CheckAndCopyCharsToDescriptor(
+          cmdmsg, "Asynchronous command execution is not supported.");
+    }
 #else
     pid_t pid{fork()};
     if (pid < 0) {

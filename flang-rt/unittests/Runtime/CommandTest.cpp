@@ -437,8 +437,14 @@ TEST_F(ZeroArguments, ECLValidCommandAndExitStatNoChangeAndCMDStatusSetAsync) {
   (*command.get(), wait, exitStat.get(), cmdStat.get(), cmdMsg.get());
 
   CheckDescriptorEqInt(exitStat.get(), 404);
+#ifdef __wasi__
+  CheckDescriptorEqInt<std::int64_t>(cmdStat.get(), -2);
+  CheckDescriptorEqStr(
+      cmdMsg.get(), "Asynchronous command execution is not supported.");
+#else
   CheckDescriptorEqInt<std::int64_t>(cmdStat.get(), 0);
   CheckDescriptorEqStr(cmdMsg.get(), "No change");
+#endif
 }
 
 TEST_F(ZeroArguments, ECLInvalidCommandParentNotTerminatedAsync) {
@@ -446,11 +452,18 @@ TEST_F(ZeroArguments, ECLInvalidCommandParentNotTerminatedAsync) {
   bool wait{false};
   OwningPtr<Descriptor> cmdMsg{CharDescriptor("No change")};
 
+#ifdef __wasi__
+  EXPECT_DEATH(RTNAME(ExecuteCommandLine)(
+                   *command.get(), wait, nullptr, nullptr, cmdMsg.get()),
+      "Asynchronous command execution is not supported on this platform.");
+#else
   EXPECT_NO_FATAL_FAILURE(RTNAME(ExecuteCommandLine)(
       *command.get(), wait, nullptr, nullptr, cmdMsg.get()));
+#endif
   CheckDescriptorEqStr(cmdMsg.get(), "No change");
 }
 
+#ifndef __wasi__
 TEST_F(ZeroArguments, ECLInvalidCommandAsyncDontAffectSync) {
   OwningPtr<Descriptor> command{CharDescriptor("echo hi")};
 
@@ -468,6 +481,7 @@ TEST_F(ZeroArguments, ECLInvalidCommandAsyncDontAffectAsync) {
   EXPECT_NO_FATAL_FAILURE(RTNAME(ExecuteCommandLine)(
       *command.get(), false, nullptr, nullptr, nullptr));
 }
+#endif
 
 TEST_F(ZeroArguments, SystemValidCommandExitStat) {
   // envrionment setup for SYSTEM from EXECUTE_COMMAND_LINE runtime
