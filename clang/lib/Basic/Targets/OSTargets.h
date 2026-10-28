@@ -996,8 +996,10 @@ class LLVM_LIBRARY_VISIBILITY WASIXTargetInfo
     Builder.defineMacro("__wasix__");
     if (Triple.getOSName() == "wasixv2") {
       Builder.defineMacro("__wasixv2__");
-      // WASIX v2 is a POSIX-oriented platform.
+      // WASIX v2 runs Linux userspace: its syscall table, flags and layouts
+      // are Linux's. No __gnu_linux__: the libc is musl-based, not glibc.
       DefineStd(Builder, "unix", Opts);
+      DefineStd(Builder, "linux", Opts);
     } else {
       // WASIX v1 is derived from wasi-libc/WASIp1, so code targeting it may
       // legitimately gate on __wasi__. v2 deliberately does NOT define

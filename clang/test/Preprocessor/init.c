@@ -2102,6 +2102,10 @@
 // WEBASSEMBLY-NEXT:#define __clang_patchlevel__ {{.*}}
 // WEBASSEMBLY-NEXT:#define __clang_version__ "{{.*}}"
 // WEBASSEMBLY-NEXT:#define __clang_wide_literal_encoding__ {{.*}}
+// WASI-NOT:#define __linux
+// WASIXV1-NOT:#define __linux
+// WASIXV2-NEXT:#define __linux 1
+// WASIXV2-NEXT:#define __linux__ 1
 // WEBASSEMBLY-NEXT:#define __llvm__ 1
 // WASI-NOT:#define __unix
 // WASI-NOT:#define __unix__
@@ -2133,6 +2137,9 @@
 // WEBASSEMBLY64-NEXT:#define __wasm64 1
 // WEBASSEMBLY64-NEXT:#define __wasm64__ 1
 // WEBASSEMBLY-NEXT:#define __wasm__ 1
+// WASI-NOT:#define linux 1
+// WASIXV2:#define linux 1
+// WASIXV1-NOT:#define linux 1
 // EMSCRIPTEN:#define unix 1
 // WASI-NOT:#define unix 1
 // WASIXV2:#define unix 1
