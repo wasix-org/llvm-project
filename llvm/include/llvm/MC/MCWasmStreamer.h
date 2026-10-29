@@ -11,10 +11,13 @@
 
 #include "MCAsmBackend.h"
 #include "MCCodeEmitter.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/Support/DataTypes.h"
+#include <string>
+#include <utility>
 
 namespace llvm {
 class MCExpr;
@@ -34,6 +37,7 @@ public:
   /// state management
   void reset() override {
     SeenIdent = false;
+    Symvers.clear();
     MCObjectStreamer::reset();
   }
 
@@ -49,6 +53,8 @@ public:
                         Align ByteAlignment) override;
 
   void emitELFSize(MCSymbol *Symbol, const MCExpr *Value) override;
+  void emitELFSymverDirective(const MCSymbol *OriginalSym, StringRef Name,
+                              bool KeepOriginalSym) override;
 
   void emitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size,
                              Align ByteAlignment) override;
@@ -59,6 +65,7 @@ public:
 
 private:
   bool SeenIdent;
+  SmallVector<std::pair<const MCSymbol *, std::string>, 0> Symvers;
 };
 
 } // end namespace llvm

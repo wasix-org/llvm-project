@@ -14,6 +14,7 @@
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCCodeEmitter.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCObjectStreamer.h"
@@ -146,7 +147,59 @@ void MCWasmStreamer::emitIdent(StringRef IdentString) {
   // sections in the object format
 }
 
+void MCWasmStreamer::emitELFSymverDirective(const MCSymbol *OriginalSym,
+                                            StringRef Name,
+                                            bool KeepOriginalSym) {
+  if (!KeepOriginalSym) {
+    getContext().reportError(SMLoc(),
+                             "symbol removal is not supported for WebAssembly");
+    return;
+  }
+  Symvers.emplace_back(OriginalSym, Name.str());
+}
+
 void MCWasmStreamer::finishImpl() {
+  // Wasm has no dynamic symbol version lookup. Preserve qualified names as
+  // ordinary static aliases; @@ additionally supplies the unqualified default.
+  // Delay until definitions are known, since module-level inline asm can
+  // precede the function whose signature and binding the alias must inherit.
+  for (const auto &[Symbol, Name] : Symvers) {
+    const auto &Original = static_cast<const MCSymbolWasm &>(*Symbol);
+    if (!Original.isDefined()) {
+      getContext().reportError(SMLoc(),
+                               "WebAssembly .symver requires a defined symbol");
+      continue;
+    }
+    if (!Original.isFunction() && !Original.isData()) {
+      getContext().reportError(
+          SMLoc(), "WebAssembly .symver requires a function or data symbol");
+      continue;
+    }
+    auto [Base, Version] = StringRef(Name).split('@');
+    auto Alias = [&](StringRef AliasName) {
+      auto *Target = static_cast<MCSymbolWasm *>(
+          getContext().getOrCreateSymbol(AliasName));
+      if (Target == Symbol)
+        return;
+      if (Target->isDefined()) {
+        getContext().reportError(SMLoc(),
+                                 "symbol version alias is already defined");
+        return;
+      }
+      if (auto Type = Original.getType())
+        Target->setType(*Type);
+      Target->setSignature(
+          const_cast<wasm::WasmSignature *>(Original.getSignature()));
+      Target->setExternal(Original.isExternal());
+      Target->setWeak(Original.isWeak());
+      Target->setHidden(Original.isHidden());
+      emitAssignment(Target, MCSymbolRefExpr::create(Symbol, getContext()));
+    };
+    bool Default = Version.consume_front("@");
+    Alias((Base + "@" + Version).str());
+    if (Default)
+      Alias(Base);
+  }
   emitFrames();
 
   this->MCObjectStreamer::finishImpl();

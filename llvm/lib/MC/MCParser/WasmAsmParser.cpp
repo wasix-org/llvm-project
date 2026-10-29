@@ -57,6 +57,7 @@ public:
     addDirectiveHandler<&WasmAsmParser::parseSectionDirectiveData>(".data");
     addDirectiveHandler<&WasmAsmParser::parseSectionDirective>(".section");
     addDirectiveHandler<&WasmAsmParser::parseDirectiveSize>(".size");
+    addDirectiveHandler<&WasmAsmParser::parseDirectiveSymver>(".symver");
     addDirectiveHandler<&WasmAsmParser::parseDirectiveType>(".type");
     addDirectiveHandler<&WasmAsmParser::ParseDirectiveIdent>(".ident");
     addDirectiveHandler<
@@ -84,6 +85,32 @@ public:
     if (!isNext(Kind))
       return error(std::string("Expected ") + KindName + ", instead got: ",
                    Lexer->getTok());
+    return false;
+  }
+
+  bool parseDirectiveSymver(StringRef, SMLoc) {
+    MCSymbol *Original;
+    if (Parser->parseSymbol(Original))
+      return TokError("expected identifier");
+    if (Lexer->isNot(AsmToken::Comma))
+      return TokError("expected a comma");
+    const bool AllowAt = Lexer->getAllowAtInIdentifier();
+    Lexer->setAllowAtInIdentifier(true);
+    Lex();
+    Lexer->setAllowAtInIdentifier(AllowAt);
+    StringRef Name;
+    if (Parser->parseIdentifier(Name))
+      return TokError("expected identifier");
+    size_t At = Name.find('@');
+    if (At == StringRef::npos || At == 0)
+      return TokError("expected a version-qualified symbol name");
+    StringRef Version = Name.drop_front(At);
+    unsigned Count = Version.take_while([](char C) { return C == '@'; }).size();
+    if (Count > 2 || Version.size() == Count)
+      return TokError("expected symbol@version or symbol@@version");
+    if (Parser->parseEOL())
+      return true;
+    getStreamer().emitELFSymverDirective(Original, Name, true);
     return false;
   }
 
